@@ -4,7 +4,9 @@ import { buildRoom } from './room.js';
 import { createTV } from './tv.js';
 import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
-import { createAttention } from './attention-stand-in.js'; // TODO(#4): real module + lineup
+// TODO(#4): replace with `import { createAttention } from './attention/index.js';`
+// and `import { LINEUP } from './attention/lineup.js';`, then delete the stand-in.
+import { createAttention } from './attention-stand-in.js';
 import { SENSORS } from './sensors/index.js';
 import { FEATURES } from './features/index.js';
 
@@ -135,10 +137,21 @@ startButton.addEventListener('click', async () => {
 });
 
 // --- Frame pipeline: sensors -> attention -> features -> render ---
+// Coordinate frames: headPos, headQuat and fingertips are in the XR reference
+// space, which is the scene's world coordinates. `world` (room, TV, panels) is
+// moved by calibration, so convert with world.worldToLocal / localToWorld when
+// placing things relative to the room.
+// ctx.tv exposes group (#10 shrinks it), screenMaterial and texture (#8's palm screens).
 const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
 const updateFeatures = FEATURES.map((setup) => setup(ctx));
-const attention = createAttention(); // TODO(#4): createAttention(lineup)
+const attention = createAttention(); // TODO(#4): createAttention(LINEUP)
+
+// Latest `debug` values returned by sensors and features, merged into the status line.
+const moduleDebug = {};
+function collectDebug(result) {
+  if (result?.debug) Object.assign(moduleDebug, result.debug);
+}
 
 // Every field #4's contract defines, with neutral values; sensors overwrite them.
 function blankSignals(t, inVR) {
@@ -152,7 +165,6 @@ function blankSignals(t, inVR) {
     fingertips: [],
     fingertipTravel: 0,
     skipDistance: null,
-    skipTouched: false,
     selectStarted: false,
     selectHeld: 0,
     micLevel: null,
@@ -169,6 +181,8 @@ let fpsWindowStart = performance.now();
 let lastStatusLog = 0;
 let lastSnap = 0;
 let lastScreen = null;
+let peakMic = 0;
+const round = (x, places) => (typeof x === 'number' ? +x.toFixed(places) : x);
 
 renderer.setAnimationLoop((time, xrFrame) => {
   const inVR = Boolean(renderer.xr.isPresenting && xrFrame);
@@ -180,11 +194,12 @@ renderer.setAnimationLoop((time, xrFrame) => {
 
   const signals = blankSignals(time / 1000, inVR);
   const frame = { time, xrFrame, pose, inVR };
-  for (const read of readSensors) read(signals, frame);
+  for (const read of readSensors) collectDebug(read(signals, frame));
+  if (signals.micLevel !== null) peakMic = Math.max(peakMic, signals.micLevel);
 
   const output = attention.update(signals);
 
-  for (const update of updateFeatures) update(output, signals);
+  for (const update of updateFeatures) collectDebug(update(output, signals));
 
   if (output.screen !== lastScreen) {
     lastScreen = output.screen;
@@ -205,8 +220,16 @@ renderer.setAnimationLoop((time, xrFrame) => {
     rlog('status', {
       screen: output.screen,
       adIndex: output.adIndex,
+      playing: output.playing,
+      target: output.target,
+      tint: output.tint,
+      banner: output.banner,
+      skip: { state: output.skip.state, progress: round(output.skip.progress, 2) },
+      gate: { visible: output.gate.visible, level: round(output.gate.level, 3) },
+      finale: output.finale,
       angle: +signals.headAngle.toFixed(1),
       mic: mic === null ? null : +mic.toFixed(3),
+      micPeak: +peakMic.toFixed(3),
       micAvailable: signals.micAvailable,
       fps,
       mode: inVR ? (calibrated ? 'vr-calibrated' : 'vr') : 'desktop',
@@ -215,6 +238,7 @@ renderer.setAnimationLoop((time, xrFrame) => {
       fingertips: signals.fingertips.length,
       micState: getMicDiagnostics(),
       video: video ? { paused: video.paused, t: +video.currentTime.toFixed(1), muted: video.muted } : null,
+      ...moduleDebug,
     });
   }
 

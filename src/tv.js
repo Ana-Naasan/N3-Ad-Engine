@@ -4,6 +4,7 @@ import * as THREE from 'three';
 // card or one of several videos.
 
 const VIDEO_NAMES = ['content', 'ad1', 'ad2', 'ad3', 'ad4'];
+const TV_DIM_BRIGHTNESS = 0.2; // screen brightness while the ad plays on the palms
 
 function makeVideo(name) {
   const video = document.createElement('video');
@@ -75,7 +76,8 @@ export function createTV() {
   }
 
   return {
-    group,
+    group, // #10 shrinks this for the finale
+    screenMaterial,
     videos,
 
     // Must run inside a user gesture: one play() per element unlocks it with sound.
@@ -86,9 +88,10 @@ export function createTV() {
       }
     },
 
-    // Apply one frame of attention output: { screen, playing, loop, seek }.
-    apply({ screen: name, playing, loop, seek }) {
+    // Apply one frame of attention output: { screen, playing, loop, seek, tvDim }.
+    apply({ screen: name, playing, loop, seek, tvDim }) {
       if (name !== shown) switchTo(name);
+      screenMaterial.color.setScalar(tvDim ? TV_DIM_BRIGHTNESS : 1);
       if (!current) return;
       const { video } = current;
       video.loop = Boolean(loop);
