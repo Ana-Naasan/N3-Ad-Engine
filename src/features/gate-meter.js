@@ -9,7 +9,7 @@ const WIDTH = 0.15; // metres
 const HEIGHT = 0.9; // same as the TV screen
 // Centre, beside the TV: about 8 cm right of the bezel. At 2.2 m that's about
 // 24° off the TV line, under look-away's 30°, so watching the meter doesn't pause the ad.
-const X = 1.0;
+const BESIDE_TV_X = 1.0;
 const PAD = 0.012; // fill inset from the card edge
 const RADIUS = 0.02;
 // The line sits 75% up the bar, as in still 6, so the bar tops out at line / 0.75.
@@ -17,8 +17,9 @@ const LINE_AT = 0.75;
 const LINE_OVERHANG = 0.022; // each side, past the card
 const LINE_THICKNESS = 0.016;
 const DASHES = 4;
-// Fast rise, slow fall (per frame), so a shout stays readable for a moment.
-const FALL = 0.95;
+// The bar jumps up to a new level and falls back with this half-life, so a
+// shout stays readable for a moment.
+const FALL_HALF_LIFE = 0.2; // seconds
 
 const PANEL = new THREE.Color(0x140e0a); // panels.js card colour
 const AMBER = new THREE.Color(0xe9a03b);
@@ -74,18 +75,22 @@ export default function gateMeter({ world, tv }) {
   group.add(line);
 
   let shown = 0;
+  let lastT = null;
 
-  return (output) => {
+  return (output, signals) => {
     const meter = output.gate;
     group.visible = Boolean(meter?.visible);
     if (!group.visible) {
       shown = 0;
+      lastT = null;
       return;
     }
     group.position.copy(tv.group.position); // follows calibration
-    group.position.x += X;
-    shown = Math.max(meter.level ?? 0, shown * FALL);
-    const top = meter.line / LINE_AT;
-    fill.scale.y = Math.max(1e-4, Math.min(1, shown / top) * track);
+    group.position.x += BESIDE_TV_X;
+    const dt = lastT === null ? 0 : Math.max(0, signals.t - lastT);
+    lastT = signals.t;
+    shown = Math.max(meter.level ?? 0, shown * 0.5 ** (dt / FALL_HALF_LIFE));
+    const fullBarLevel = meter.line / LINE_AT;
+    fill.scale.y = Math.max(1e-4, Math.min(1, shown / fullBarLevel) * track);
   };
 }
