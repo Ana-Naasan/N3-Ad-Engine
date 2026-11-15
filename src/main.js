@@ -189,7 +189,7 @@ function blankSignals(t, inVR) {
     clap: false,
     jumpTo: null,
     pick: null, // null: no picker on the TV; false/true: the viewer has picked a video
-    video: { t: 0, ended: false, failed: false },
+    video: { t: 0, ended: false, failed: false, playing: false },
   };
 }
 

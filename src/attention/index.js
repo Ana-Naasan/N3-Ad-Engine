@@ -16,12 +16,16 @@
 //     included. The output carries it; `domain` is null otherwise.
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
 // the finale.
+// A content step lasts its `seconds` of signals.video.playing, so no ad starts
+// before the viewer's video really plays; if it hasn't played for
+// STALLED_CONTENT_SECONDS, the next ad starts anyway, so a dead video can't
+// strand the viewer.
 // signals.pick: null when the card is the "Pinch to play" card; with a video
 // picker on the TV, false until the viewer picks a video and true once they have.
 //
 // The `ad` a rule receives is the lineup entry plus `index` (position in the
 // lineup, -1 for the card), `adIndex` (1–4, 0 before the ads) and `startedAt`.
-import { LINEUP, FAILED_AD_SECONDS } from './lineup.js';
+import { LINEUP, FAILED_AD_SECONDS, STALLED_CONTENT_SECONDS } from './lineup.js';
 import { RULES } from './rules/index.js';
 
 const BANNER_PRIORITY = ['domain', 'lookAway', 'skip', 'gate'];
@@ -43,6 +47,8 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
   let usedJump = false;
   let frozen = false;
   let restartArmed = false; // a select started during the finale
+  let played = 0; // seconds the current content step's video has really played
+  let lastPlayedAt = 0; // when it last played (or the step started)
   const freshStats = () => ({ adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 });
   let stats = freshStats();
 
@@ -51,6 +57,8 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     if (!entry) return;
     step = { ...entry, index, adIndex: ads.indexOf(entry) + 1, startedAt: t };
     restartArmed = false;
+    played = 0;
+    lastPlayedAt = t;
     if (entry.finale) frozen = true;
   }
 
@@ -74,13 +82,19 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     }
 
     const before = step;
+    const video = signals.video || {};
 
     // Built-in steps: the card waits for the viewer to start their video; content
-    // plays for its seconds. With a picker on the TV (signals.pick is a boolean)
-    // selects are its clicks, so only a pick starts; otherwise any select does.
+    // plays for its seconds of real playback. With a picker on the TV (signals.pick
+    // is a boolean) selects are its clicks, so only a pick starts; otherwise any select does.
     const started = signals.pick == null ? signals.selectStarted : signals.pick;
+    if (step.kind === 'content' && video.playing) {
+      played += dt;
+      lastPlayedAt = t;
+    }
     if (step.kind === 'card' && started) goTo(0, t);
-    else if (step.kind === 'content' && t - step.startedAt >= step.seconds) goTo(step.index + 1, t);
+    else if (step.kind === 'content'
+      && (played >= step.seconds || t - lastPlayedAt >= STALLED_CONTENT_SECONDS)) goTo(step.index + 1, t);
 
     let results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
     if (results.some(({ r }) => r.domain)) {
@@ -96,7 +110,6 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
 
     // Moving on: a jump, a pass, or a no-gimmick ad that ended or failed.
     const { jumpTo } = signals;
-    const video = signals.video || {};
     if (step.finale) {
       // The finale loops forever and never advances; a held select restarts.
       if (signals.selectStarted) restartArmed = true;
@@ -114,7 +127,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     const out = {
       screen: step.screen,
       playing: step.kind !== 'card',
-      loop: Boolean(step.gimmick || step.finale),
+      loop: Boolean(step.gimmick || step.finale || step.kind === 'content'), // a short video can't end mid-run
       seek: 0,
       target: 'tv',
       tvDim: false,

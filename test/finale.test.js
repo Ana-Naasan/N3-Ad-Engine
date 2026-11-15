@@ -37,18 +37,22 @@ const bump = {
 describe('finale entry', () => {
   it('a run without jumps ends in the finale: flag, banner and the stats frozen at entry', () => {
     const run = createRun({ rules: [...RULES, bump] });
-    run.toFirstAd(); // GLOOP starts at t = 1, after exactly 1 s of content
+    run.toFirstAd(); // GLOOP starts at t = 8, after exactly 8 s of content
     run.run(4 * DT, { bump: true, micLevel: 0.3 });
-    expect(until(run, (out) => out.screen !== 'ad1').out.screen).toBe('ad2'); // GLOOP's video ends
-    expect(forcePass(run).out.screen).toBe('ad3'); // past GRIN+
-    const entry = forcePass(run); // past WRAPZILLA
+    const resumed = () => until(run, (out) => out.screen !== 'content').out.screen; // 5 s of video
+    expect(until(run, (out) => out.screen !== 'ad1').out.screen).toBe('content'); // GLOOP's video ends
+    expect(resumed()).toBe('ad2');
+    expect(forcePass(run).out.screen).toBe('content'); // past GRIN+
+    expect(resumed()).toBe('ad3');
+    expect(forcePass(run).out.screen).toBe('content'); // past WRAPZILLA
+    const entry = until(run, (out) => out.screen !== 'content');
 
     expect(entry.out).toMatchObject({
       screen: 'ad4', finale: true, banner: FINALE_BANNER, playing: true, loop: true, usedJump: false,
     });
     const { adTime, ...rest } = entry.out.stats;
-    expect(rest).toEqual({ videoTime: 1, headTurns: 4, chaseMetres: 1, peakVolume: 0.3 });
-    expect(adTime).toBeCloseTo(entry.t - 1, 9); // every second from GLOOP's start to entry
+    expect(rest).toEqual({ videoTime: 8 + 3 * 5, headTurns: 4, chaseMetres: 1, peakVolume: 0.3 });
+    expect(adTime).toBeCloseTo(entry.t - 23, 9); // every other second up to entry
 
     run.run(30, { bump: true, micLevel: 0.9 });
     expect(run.out).toMatchObject({ screen: 'ad4', finale: true, banner: FINALE_BANNER });

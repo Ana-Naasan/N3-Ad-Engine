@@ -87,7 +87,8 @@ export function createTV() {
     shown = name;
     playFailed = false;
     current = (name === 'content' && contentLive ? null : videos[name]) ?? null;
-    if (current) current.video.currentTime = 0; // every screen starts from the top
+    // Every ad starts from the top; the content carries on where the ad cut in.
+    if (current && name !== 'content') current.video.currentTime = 0;
     showMap(current ? current.texture : live ?? cardTexture);
   }
 
@@ -154,6 +155,7 @@ export function createTV() {
       contentId = 'content';
       contentLive = false;
       setContentUrl(videoUrl('content'));
+      videos.content.video.currentTime = 0;
     },
 
     // Names the content's file, /videos/<contentId>.mp4: a featured video's YouTube
@@ -166,6 +168,11 @@ export function createTV() {
     // What the content screen shows, for the finale's postcard.
     get contentTexture() {
       return contentLive && live ? live : videos.content.texture;
+    },
+
+    // The content screen is showing the YouTube mirror itself (a pick with no file).
+    get showingLiveContent() {
+      return shown === 'content' && contentLive;
     },
 
     get currentVideo() {

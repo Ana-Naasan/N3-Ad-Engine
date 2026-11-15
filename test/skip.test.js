@@ -82,7 +82,7 @@ describe('the full state path', () => {
     expect(run.out.skip).toEqual({ state: 'enabled', progress: 1, jump: 6 });
     expect(run.out.banner).toBe(null);
     run.frame({ skipDistance: 0.03 });
-    expect(run.out.screen).toBe('ad3');
+    expect(run.out.screen).toBe('content');
   });
 
   it('ignores fingertips while flying out', () => {
@@ -220,7 +220,7 @@ describe('the pass', () => {
     const run = toEnabled();
     run.run(1, { skipDistance: 0.045 });
     expect(run.out.screen).toBe('ad2');
-    expect(run.frame({ skipDistance: 0.035 }).screen).toBe('ad3');
+    expect(run.frame({ skipDistance: 0.035 }).screen).toBe('content');
   });
 
   it('a finger still resting on Skip from the catch must lift and touch again', () => {
@@ -229,7 +229,7 @@ describe('the pass', () => {
     expect(run.out.skip.state).toBe('enabled');
     expect(run.out.screen).toBe('ad2');
     run.frame({ skipDistance: FAR });
-    expect(run.frame({ skipDistance: 0.02 }).screen).toBe('ad3');
+    expect(run.frame({ skipDistance: 0.02 }).screen).toBe('content');
   });
 
   it('a finger that came back to rest on Skip during the hold must lift too', () => {
