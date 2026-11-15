@@ -26,17 +26,16 @@ export function createSkyScreen() {
       material.needsUpdate = true;
     },
 
-    // t: 0 = hidden, 0..1 = growing from TV size behind `from` (the TV's start position), 1 = full size.
-    update(t, from) {
-      mesh.visible = t > 0;
+    // grow: 0 = hidden, 0..1 = growing from TV size behind `from` (the TV's start position), 1 = full size.
+    update(grow, from) {
+      mesh.visible = grow > 0;
       if (!mesh.visible) return;
-      from ??= POSITION;
       mesh.position.set(
-        THREE.MathUtils.lerp(from.x, POSITION.x, t),
-        THREE.MathUtils.lerp(from.y, POSITION.y, t),
+        THREE.MathUtils.lerp(from.x, POSITION.x, grow),
+        THREE.MathUtils.lerp(from.y, POSITION.y, grow),
         POSITION.z, // stays against the wall, so it never z-fights the TV
       );
-      mesh.scale.setScalar(THREE.MathUtils.lerp(TV_WIDTH / WIDTH, 1, t));
+      mesh.scale.setScalar(THREE.MathUtils.lerp(TV_WIDTH / WIDTH, 1, grow));
     },
   };
 }

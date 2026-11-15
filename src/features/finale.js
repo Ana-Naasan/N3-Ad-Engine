@@ -9,16 +9,16 @@ import { createReceipt } from './finale/receipt.js';
 // feature, so tv.texture is already the finale ad on the entry frame.
 // The sky screen and receipt live in `world`, which calibration moves.
 export default function finale({ world, tv }) {
-  const postcard = createPostcard(tv.group, { face: tv.videos.content.texture });
+  const postcard = createPostcard(tv.group, tv.videos.content.texture);
   const sky = createSkyScreen();
   const receipt = createReceipt();
   world.add(sky.mesh, receipt.mesh);
 
   return (output, signals) => {
-    const t = postcard.update(output.finale, signals.t);
+    const shrink = postcard.update(output.finale, signals.t);
     sky.setTexture(output.finale ? tv.texture : null);
-    sky.update(t, postcard.startPosition);
-    receipt.update(output.finale ? output.stats : null, t, postcard.startPosition?.y);
-    return { debug: { finaleShrink: +t.toFixed(2) } };
+    sky.update(shrink, postcard.startPosition);
+    receipt.update(output.finale ? output.stats : null, shrink);
+    return { debug: { finaleShrink: +shrink.toFixed(2) } };
   };
 }

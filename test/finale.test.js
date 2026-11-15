@@ -1,6 +1,7 @@
-// The finale (VOIDCOLA), reached the way a viewer reaches it: no key jumps.
-// Runs with the registered rule list, so every rule that ships is checked
-// against the finale too. Spec values are written out literally.
+// The finale (VOIDCOLA): entering it the way a viewer does (no key jumps),
+// and looking around freely once there. Runs with the registered rule list,
+// so every rule that ships is checked against the finale too. Spec values
+// are written out literally.
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
 import { RULES } from '../src/attention/rules/index.js';

@@ -6,48 +6,51 @@ import * as THREE from 'three';
 const WIDTH = 0.45; // metres
 const PX_PER_METRE = 1200;
 const FONT_PX = 28;
-const LINE = 42;
-const RULE = 20;
-const PAD = 32;
-const TOOTH = 15; // torn bottom edge
+const LINE_PX = 42;
+const RULE_PX = 20;
+const PAD_PX = 32;
+const TOOTH_PX = 15; // torn bottom edge
 const PAPER = '#fbf8f1';
 const INK = '#222';
 
 // Placement in the TV's parent space, where the viewer sits at the origin facing -Z.
+// The height is fixed, like the room, so recentering or re-entering VR can't leave it stale.
 const DISTANCE = 1.3; // metres from the viewer
-const ANGLE = THREE.MathUtils.degToRad(24); // to the right of the TV line
-const BELOW_EYES = 0.1;
+const ANGLE = THREE.MathUtils.degToRad(22); // right of the TV line; far edge ~32°, short of the KPI board's 35°
+const HEIGHT = 1.1; // a little under a seated viewer's eyes
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const show = (value, format) => (Number.isFinite(value) && value >= 0 ? format(value) : '—');
+const formatted = (value, format) => (Number.isFinite(value) && value >= 0 ? format(value) : '—');
 
 function receiptLines(stats) {
   return [
     ['center', '*** YOUR RECEIPT ***'],
     ['rule'],
-    ['row', 'Time on ads', show(stats.adTime, clock)],
-    ['row', 'Time on video', show(stats.videoTime, clock)],
-    ['row', 'Head turns', show(stats.headTurns, (n) => String(Math.round(n)))],
-    ['row', 'Metres chasing Skip', show(stats.chaseMetres, (m) => m.toFixed(1))],
-    ['row', 'Peak volume', show(stats.peakVolume, (v) => v.toFixed(2))],
+    ['row', 'Time on ads', formatted(stats.adTime, clock)],
+    ['row', 'Time on video', formatted(stats.videoTime, clock)],
+    ['row', 'Head turns', formatted(stats.headTurns, (n) => String(Math.round(n)))],
+    ['row', 'Metres chasing Skip', formatted(stats.chaseMetres, (m) => m.toFixed(1))],
+    ['row', 'Peak volume', formatted(stats.peakVolume, (v) => v.toFixed(2))],
     ['rule'],
     ['center', 'Thank you for watching'],
   ];
 }
 
-const lineHeight = ([kind]) => (kind === 'rule' ? RULE : LINE);
+const lineHeight = ([kind]) => (kind === 'rule' ? RULE_PX : LINE_PX);
 
 export function createReceipt() {
   const layout = receiptLines({});
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(WIDTH * PX_PER_METRE);
-  canvas.height = PAD * 2 + TOOTH + layout.reduce((h, line) => h + lineHeight(line), 0);
+  canvas.height = PAD_PX * 2 + TOOTH_PX + layout.reduce((h, line) => h + lineHeight(line), 0);
   const ctx = canvas.getContext('2d');
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(WIDTH, canvas.height / PX_PER_METRE), material);
+  mesh.position.set(DISTANCE * Math.sin(ANGLE), HEIGHT, -DISTANCE * Math.cos(ANGLE));
+  mesh.rotation.y = -ANGLE; // face the viewer
   mesh.visible = false;
 
   let lastText = null;
@@ -61,10 +64,10 @@ export function createReceipt() {
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(w, 0);
-    ctx.lineTo(w, h - TOOTH);
-    for (let x = w; x > 0; x -= TOOTH * 2) {
-      ctx.lineTo(x - TOOTH, h);
-      ctx.lineTo(Math.max(0, x - TOOTH * 2), h - TOOTH);
+    ctx.lineTo(w, h - TOOTH_PX);
+    for (let x = w; x > 0; x -= TOOTH_PX * 2) {
+      ctx.lineTo(x - TOOTH_PX, h);
+      ctx.lineTo(Math.max(0, x - TOOTH_PX * 2), h - TOOTH_PX);
     }
     ctx.closePath();
     ctx.fill();
@@ -76,23 +79,23 @@ export function createReceipt() {
     ctx.font = `${FONT_PX}px ui-monospace, Menlo, monospace`;
     ctx.textBaseline = 'middle';
 
-    let y = PAD;
+    let y = PAD_PX;
     for (const line of lines) {
-      const [kind, a, b] = line;
+      const [kind, text, value] = line;
       const mid = y + lineHeight(line) / 2;
       if (kind === 'rule') {
         ctx.beginPath();
-        ctx.moveTo(PAD, mid);
-        ctx.lineTo(w - PAD, mid);
+        ctx.moveTo(PAD_PX, mid);
+        ctx.lineTo(w - PAD_PX, mid);
         ctx.stroke();
       } else if (kind === 'center') {
         ctx.textAlign = 'center';
-        ctx.fillText(a, w / 2, mid);
+        ctx.fillText(text, w / 2, mid);
       } else {
         ctx.textAlign = 'left';
-        ctx.fillText(a, PAD, mid);
+        ctx.fillText(text, PAD_PX, mid);
         ctx.textAlign = 'right';
-        ctx.fillText(b, w - PAD, mid);
+        ctx.fillText(value, w - PAD_PX, mid);
       }
       y += lineHeight(line);
     }
@@ -102,10 +105,9 @@ export function createReceipt() {
   return {
     mesh,
 
-    // stats: the frozen finale stats, or null to hide. t: 0..1 fade-in.
-    // eyeY: the viewer's eye height in the TV's parent space.
-    update(stats, t, eyeY) {
-      mesh.visible = Boolean(stats) && t > 0;
+    // stats: the frozen finale stats, or null to hide. fade: 0..1 opacity.
+    update(stats, fade) {
+      mesh.visible = Boolean(stats) && fade > 0;
       if (!mesh.visible) return;
       const lines = receiptLines(stats);
       const text = JSON.stringify(lines);
@@ -113,9 +115,7 @@ export function createReceipt() {
         lastText = text;
         draw(lines);
       }
-      material.opacity = t;
-      mesh.position.set(DISTANCE * Math.sin(ANGLE), eyeY - BELOW_EYES, -DISTANCE * Math.cos(ANGLE));
-      mesh.rotation.y = -ANGLE; // face the viewer
+      material.opacity = fade;
     },
   };
 }
