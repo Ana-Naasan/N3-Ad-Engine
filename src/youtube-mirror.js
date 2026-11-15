@@ -5,6 +5,10 @@ import { rlog } from './remote-log.js';
 // site, running in a Chrome on the dev machine, as a texture. Frames are
 // fetched one at a time while the mirror is wanted and drawn to a canvas;
 // clicks and scrolls go back as 0-1 screen coordinates.
+// When the page stops wanting frames (an ad comes up), it tells the server to
+// pause the remote video at once, and to play it again when it wants frames
+// again, so the video carries on from where the ad cut in. The server's own
+// idle pause (IDLE_MS) stays as the fallback for a headset that goes away.
 // `available` is false until a frame of a loaded YouTube page has arrived, and
 // again when the server stops answering or reports the page broken (a
 // production build has no mirror), so callers can fall back to the card.
@@ -22,6 +26,7 @@ export function createYoutubeMirror() {
   texture.colorSpace = THREE.SRGBColorSpace;
 
   let wanted = false;
+  let paused = false; // this client asked the server to pause the remote video
   let looping = false;
   let after = 0; // sequence number of the frame on the canvas
   let available = false;
@@ -49,7 +54,7 @@ export function createYoutubeMirror() {
       if (!available) rlog('youtube-mirror', { available: true });
       available = true;
     }
-    if (at !== resets) return; // asked before a reset: its state is about the old page
+    if (at !== resets || !wanted) return; // asked before a reset or a pause: its state is out of date
     playing = res.headers.get('x-yt-playing') === '1';
     local = res.headers.get('x-yt-local') || null;
   }
@@ -101,8 +106,18 @@ export function createYoutubeMirror() {
       return frames;
     },
 
-    // Fetch frames while wanted. Idle, the server pauses the remote video.
+    // Fetch frames while wanted. Going from wanted to not, the remote video
+    // pauses at once; wanted again, it plays on from there. A page that never
+    // wants frames (a Mac tab without ?mirror) never sends either.
     setWanted(on) {
+      if (wanted && !on) {
+        paused = true;
+        playing = false; // until the server reports it playing again
+        send({ type: 'pause' });
+      } else if (!wanted && on && paused) {
+        paused = false;
+        send({ type: 'play' });
+      }
       wanted = on;
       if (wanted && !looping) loop();
     },

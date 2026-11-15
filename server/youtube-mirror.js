@@ -21,7 +21,7 @@ export const START_URL = process.env.YT_START_URL
 // Quest 3 display pixel on the 1.6 m screen, and big enough targets for a hand ray.
 export const VIEW = { width: 1024, height: 576 };
 const PROBE_MS = 250; // how often the page is asked what it is doing
-const IDLE_MS = 3000; // no frame request for this long: pause the remote video
+const IDLE_MS = 3000; // no frame request for this long: pause the remote video (a headset that went away)
 const START_TIMEOUT_MS = 15000;
 const LOAD_TIMEOUT_MS = 15000; // not ready this long: the page is broken (a cold load took 8.4 s)
 const MAX_WHEEL = 2000; // px per scroll event
@@ -58,11 +58,13 @@ function allowedUrl(url) {
   }
 }
 
-// Returns a pointer event in the shape `input` takes, or null if `raw` isn't one.
-// x and y are 0-1 across the screen from its top-left corner; dy is remote px.
+// Returns an event in the shape `input` takes, or null if `raw` isn't one.
+// Pointer events: x and y are 0-1 across the screen from its top-left corner;
+// dy is remote px. 'pause' and 'play' hold and release the remote video while
+// the page shows something else (an ad); 'reset' goes back to the start page.
 export function parseInput(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  if (raw.type === 'reset') return { type: 'reset' };
+  if (['reset', 'pause', 'play'].includes(raw.type)) return { type: raw.type };
   if (!['move', 'click', 'scroll'].includes(raw.type)) return null;
   if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) return null;
   const event = { type: raw.type, x: clamp(raw.x, 0, 1), y: clamp(raw.y, 0, 1) };
@@ -91,6 +93,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
   let waiters = []; // long-polls waiting for a newer frame
   let state = IDLE_STATE;
   let idlePaused = false; // this module paused the remote player because nothing was watching
+  let held = false; // the page asked for a pause (an ad is up): the video stays paused until it asks to play
   let epoch = 0; // bumped by a reset, so a probe that straddles it is dropped
   let lastWanted = 0;
   let probeTimer = null;
@@ -211,7 +214,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     if (seen.ready) loadingSince = null;
     else loadingSince ??= Date.now();
     if (!allowedUrl(seen.url)) await reset();
-    else if (seen.playing && state.local) await evaluate(PAUSE); // the page plays its own file instead
+    else if (seen.playing && (state.local || held)) await evaluate(PAUSE); // the page plays its own file, or an ad
     else if (seen.playing && Date.now() - lastWanted > IDLE_MS) {
       await evaluate(PAUSE);
       idlePaused = true;
@@ -228,6 +231,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     epoch++;
     state = IDLE_STATE;
     idlePaused = false;
+    held = false;
     loadingSince = Date.now();
     await send('Page.navigate', { url: START_URL });
   }
@@ -258,7 +262,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     async waitFrame(after, timeoutMs) {
       lastWanted = Date.now();
       await ensureStarted();
-      if (idlePaused) { // someone is watching again: carry on where the video stopped
+      if (idlePaused && !held) { // someone is watching again: carry on where the video stopped
         idlePaused = false;
         evaluate(PLAY).catch(() => {});
       }
@@ -276,10 +280,20 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
       });
     },
 
-    // One pointer event from parseInput.
+    // One event from parseInput.
     async input(event) {
       await ensureStarted();
       if (event.type === 'reset') return reset();
+      if (event.type === 'pause') { // at once, not after IDLE_MS: the video stops where the ad cut in
+        held = true;
+        return evaluate(PAUSE);
+      }
+      if (event.type === 'play') { // the ad is over: carry on from there
+        if (!held) return; // nothing of ours to undo (a results page has preview videos)
+        held = false;
+        idlePaused = false;
+        return evaluate(PLAY);
+      }
       const x = event.x * VIEW.width;
       const y = event.y * VIEW.height;
       if (event.type === 'scroll') {

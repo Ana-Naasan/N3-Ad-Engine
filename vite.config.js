@@ -120,7 +120,7 @@ function questLog() {
           sendJson(res, 503, { error: e.message });
         }
       });
-      // One pointer event: {type: 'move' | 'click', x, y}, {type: 'scroll', x, y, dy} or {type: 'reset'}.
+      // One event: {type: 'move' | 'click', x, y}, {type: 'scroll', x, y, dy}, or {type: 'reset' | 'pause' | 'play'}.
       server.middlewares.use('/api/youtube/input', (req, res, next) => {
         if (req.method !== 'POST') return next();
         readBody(req, res, (buf) => {
@@ -129,7 +129,7 @@ function questLog() {
             event = parseInput(JSON.parse(buf));
           } catch {}
           if (!event) {
-            sendJson(res, 400, { error: 'expected {type: move|click|scroll|reset, x, y, dy}' });
+            sendJson(res, 400, { error: 'expected {type: move|click|scroll|reset|pause|play, x, y, dy}' });
             return;
           }
           youtube.input(event).catch((e) => console.warn('YouTube mirror input failed:', e.message));
