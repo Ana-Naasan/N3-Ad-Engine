@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { createBanner } from '../banner.js';
-import { DOMAIN_CAST_SECONDS, DOMAIN_SECONDS } from '../attention/rules/lookAway.js';
-import { createGojo } from './domain/gojo.js';
+import { DOMAIN_CAST_SECONDS, DOMAIN_SECONDS } from '../attention/rules/domain.js';
+import { createGojo, MODEL_URL } from './domain/gojo.js';
 import { createVoid } from './domain/void.js';
-import { createAdWall } from './domain/ad-wall.js';
+import { createAdWall, VIDEO_URL } from './domain/ad-wall.js';
 import { createTeleport, BURST_AT } from './domain/teleport.js';
 
-// The domain, while output.domain is set (the look-away rule sets it once the
-// warnings have run out). Everything is drawn from `elapsed`, the seconds
+// The domain, while output.domain is set (../attention/rules/domain.js sets it
+// once the warnings have run out). ../domain.js adds this feature after
+// FEATURES, so it is not in ./index.js. Everything is drawn from `elapsed`, the seconds
 // since it started:
 //   cast  Gojo teleports in between the viewer and the TV (a line of light
 //         that bursts as he flickers in, with the teleport sound), raises the hand sign and says his line; a dark orb grows out of his hand, and as it
@@ -17,12 +18,19 @@ import { createTeleport, BURST_AT } from './domain/teleport.js';
 // It all lives in `world`, with the viewer's head above the origin. This
 // feature runs after the others, so it can hide what they draw in `world`.
 //
+// main.js stops calling features while the run is held (the headset is off, a
+// system menu is up, or VR was left mid-run). The sound and the ad wall's
+// video are paused when that starts and resume on the next frame drawn.
+//
 // Dev aid: ?domainPreview=<seconds> shows the domain frozen at that elapsed
 // time (?domainPreview=play runs it on a loop), with no sound; &yaw=<degrees>
 // turns the desktop camera.
 
 const VOICE_URL = '/domain/voice.m4a';
 const TELEPORT_SOUND_URL = '/domain/teleport.m4a'; // 1.5 s; loud from 0.1 s in, as he snaps in
+
+// Everything this feature loads. None of it is in the repo: public/domain/SOURCES.md.
+export const MEDIA_URLS = [MODEL_URL, VIDEO_URL, VOICE_URL, TELEPORT_SOUND_URL];
 
 const GOJO_POSITION = new THREE.Vector3(0, 0, -1.35); // on the floor, in front of the TV
 const HAND = new THREE.Vector3(-0.2, 1.45, 0.15); // from his feet: where the orb starts until the model has loaded
@@ -41,13 +49,16 @@ const ORB_AT = DOMAIN_CAST_SECONDS - 1.1;
 const SWALLOW_AT = DOMAIN_CAST_SECONDS - 0.5; // the orb reaches the viewer
 const FLASH_SECONDS = 0.5;
 const END_FLASH_SECONDS = 0.6;
+// The wall goes quiet just before the end, so its noise can't pass WRAPZILLA's shout gate.
+const WALL_QUIET_SECONDS = 0.3; // silent for this long before the domain ends
+const WALL_FADE_SECONDS = 0.5; // fading out before that
 
 const CAPTION = 'Domain Expansion: Unlimited Ads';
 const CAPTION_SCALE = 0.5; // of the 2 m banner card
 const CAPTION_POSITION = new THREE.Vector3(0, 0.62, -1.05); // in front of his shins
 const CAPTION_RENDER_ORDER = 20; // over the red tint (10), under the flash (30)
 
-const params = new URLSearchParams(location.search);
+const params = new URLSearchParams(globalThis.location?.search ?? '');
 const PREVIEW = params.get('domainPreview');
 const TOTAL = DOMAIN_CAST_SECONDS + DOMAIN_SECONDS;
 
@@ -57,7 +68,7 @@ function previewDomain(t) {
   return { phase: elapsed < DOMAIN_CAST_SECONDS ? 'cast' : 'ads', elapsed };
 }
 
-// One silent play inside the Start gesture, so the element may play with sound later.
+// One silent play inside a user gesture, so the element may play with sound later.
 function primeSilently(sound) {
   sound.volume = 0;
   sound.play().then(() => {
@@ -75,7 +86,7 @@ function playFromStart(sound) {
 // For the status log: 'failed', or the element's clock.
 const soundStatus = (sound) => (sound.error ? 'failed' : `${sound.currentTime.toFixed(1)}s${sound.paused ? ' paused' : ''}`);
 
-export default function domain({ world, tv, camera, primers }) {
+export default function domain({ renderer, world, tv, camera }) {
   const gojo = createGojo();
   const space = createVoid();
   const wall = createAdWall({ muted: PREVIEW !== null });
@@ -100,11 +111,29 @@ export default function domain({ world, tv, camera, primers }) {
   const teleportSound = new Audio(TELEPORT_SOUND_URL);
   voice.preload = teleportSound.preload = 'auto';
 
-  primers.push(() => {
+  // Must run inside a user gesture, like tv.primeAll().
+  document.getElementById('start')?.addEventListener('click', () => {
     wall.prime();
     primeSilently(voice);
     primeSilently(teleportSound);
   });
+
+  // The run is held: nothing of the domain may play on unseen.
+  let holds = 0;
+  let heldSounds = []; // what was playing, to resume
+  function pauseForHold() {
+    holds += 1;
+    heldSounds = [...heldSounds, ...[voice, teleportSound].filter((sound) => !sound.paused && !heldSounds.includes(sound))];
+    for (const sound of heldSounds) sound.pause();
+    wall.pause();
+  }
+  renderer.xr.addEventListener('sessionstart', () => {
+    const session = renderer.xr.getSession();
+    session.addEventListener('visibilitychange', () => {
+      if (session.visibilityState !== 'visible') pauseForHold();
+    });
+  });
+  renderer.xr.addEventListener('sessionend', pauseForHold);
 
   if (PREVIEW !== null && params.has('yaw')) {
     camera.rotation.set(0, THREE.MathUtils.degToRad(Number(params.get('yaw'))), 0);
@@ -134,6 +163,7 @@ export default function domain({ world, tv, camera, primers }) {
     const state = PREVIEW !== null ? previewDomain(t) : output.domain;
 
     if (!state) {
+      heldSounds = [];
       if (lastElapsed !== null) {
         lastElapsed = null;
         endedAt = t;
@@ -152,6 +182,8 @@ export default function domain({ world, tv, camera, primers }) {
       group.visible = flash > 0;
       return { debug: { domain: null } };
     }
+
+    for (const sound of heldSounds.splice(0)) sound.play().catch(() => {}); // the run is watchable again
 
     const { elapsed } = state;
     const inVoid = elapsed >= SWALLOW_AT;
@@ -185,7 +217,8 @@ export default function domain({ world, tv, camera, primers }) {
     if (inVoid) hideWorld();
     else restoreWorld(); // only the preview can go back in time
 
-    wall.update(adsSeconds >= 0, adsSeconds, adsSeconds / DOMAIN_SECONDS);
+    const wallVolume = (DOMAIN_SECONDS - adsSeconds - WALL_QUIET_SECONDS) / WALL_FADE_SECONDS;
+    wall.update(adsSeconds >= 0, adsSeconds, adsSeconds / DOMAIN_SECONDS, THREE.MathUtils.clamp(wallVolume, 0, 1));
 
     if (adsSeconds >= 0) {
       const left = Math.ceil(DOMAIN_SECONDS - adsSeconds);
@@ -203,6 +236,7 @@ export default function domain({ world, tv, camera, primers }) {
           ads: wall.status,
           voice: soundStatus(voice),
           teleport: soundStatus(teleportSound),
+          holds,
         },
       },
     };

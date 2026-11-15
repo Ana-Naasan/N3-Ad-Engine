@@ -1,9 +1,16 @@
-// Warnings and the domain: the first 3 look-aways are warnings; the next one
-// starts the domain (5 s cast, then 30 s of ad wall) instead. Spec values
-// (3 warnings, 5 s, 30 s) are written out literally so changing a constant
-// makes a test fail.
+// Warnings and the domain (off with ?domain=0): the first 3 look-aways are
+// warnings; the next one starts the domain (5 s cast, then 30 s of ad wall)
+// instead. Spec values (3 warnings, 5 s, 30 s) are written out literally so
+// changing a constant makes a test fail.
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
+import { LINEUP } from '../src/attention/lineup.js';
+import { RULES } from '../src/attention/rules/index.js';
+import { domainFor } from '../src/domain.js';
+
+// The run as main.js builds it for a URL: RULES, then what the URL's flags add.
+const runFor = (search) => createRun({ lineup: LINEUP, rules: [...RULES, ...domainFor(search).rules] });
+const domainRun = () => runFor('');
 
 const AWAY = { headAngle: 40 };
 const BACK = { headAngle: 0 };
@@ -17,7 +24,7 @@ function glance(run) {
 }
 
 // Uses up the 3 warnings on GLOOP, then looks away once more.
-function startDomain(run = createRun()) {
+function startDomain(run = domainRun()) {
   if (!run.out) run.toFirstAd();
   for (let i = 0; i < 3; i++) glance(run);
   run.frame(AWAY);
@@ -26,7 +33,7 @@ function startDomain(run = createRun()) {
 
 describe('warnings', () => {
   it('the first three look-aways are warning 1 of 3, 2 of 3 and the final warning', () => {
-    const run = createRun();
+    const run = domainRun();
     run.toFirstAd();
     const outs = [glance(run), glance(run), glance(run)];
     expect(outs.map((o) => o.banner)).toEqual([
@@ -38,7 +45,7 @@ describe('warnings', () => {
   });
 
   it('one long look-away uses one warning, however often it rewinds', () => {
-    const run = createRun();
+    const run = domainRun();
     run.toFirstAd();
     run.run(10, AWAY);
     expect(run.out.banner).toBe(`${LOOK_AWAY} (warning 1 of 3)`);
@@ -46,7 +53,7 @@ describe('warnings', () => {
   });
 
   it('warnings carry over from one ad to the next', () => {
-    const run = createRun();
+    const run = domainRun();
     run.toFirstAd();
     glance(run);
     glance(run);
@@ -91,7 +98,7 @@ describe('the domain', () => {
   });
 
   it('when it ends the ad starts again from the top and plays', () => {
-    const run = createRun();
+    const run = domainRun();
     run.toFirstAd();
     run.run(6); // 6 s into GLOOP
     startDomain(run);
@@ -101,6 +108,17 @@ describe('the domain', () => {
     expect(run.video.t).toBe(at); // paused throughout
     expect(run.frame()).toMatchObject({ screen: 'ad1', playing: true, seek: -at, domain: null, banner: null });
     expect(run.video.t).toBe(DT); // from 0, one frame played
+  });
+
+  it('a look-away still going on when it ends is the first new warning', () => {
+    const run = startDomain();
+    run.run(35 - DT, AWAY);
+    expect(run.out.domain).not.toBe(null);
+    expect(run.frame(AWAY)).toMatchObject({
+      playing: false, tint: 'red', domain: null, banner: `${LOOK_AWAY} (warning 1 of 3)`,
+    });
+    run.frame(BACK);
+    expect(glance(run).banner).toBe(`${LOOK_AWAY} (warning 2 of 3)`);
   });
 
   it('when it ends the warnings are back', () => {
@@ -130,7 +148,7 @@ describe('the domain', () => {
   });
 
   it('on WRAPZILLA it hides the gate, and a shout or a clap passes nothing until it ends', () => {
-    const run = createRun();
+    const run = domainRun();
     run.frame({ jumpTo: 3 });
     const shout = { micLevel: 0.9, micAvailable: true, clap: true };
     startDomain(run);
@@ -152,9 +170,45 @@ describe('the domain', () => {
 
   it('never starts where look-away does not apply: GRIN+ and the finale', () => {
     for (const ad of [2, 4]) {
-      const run = createRun();
+      const run = domainRun();
       run.frame({ jumpTo: ad });
       for (let i = 0; i < 12; i++) expect(glance(run).domain).toBe(null);
     }
+  });
+});
+
+describe('the ?domain flag', () => {
+  it('the domain is on by default; ?domain=0 or missing media adds nothing', () => {
+    for (const search of ['', '?hints', '?domain', '?domain=1', '?fakeout']) {
+      const on = domainFor(search);
+      expect(on.on).toBe(true);
+      expect(on.rules.map((r) => r.id)).toEqual(['domain']);
+      expect(on.features).toHaveLength(1);
+    }
+    for (const off of [domainFor('?domain=0'), domainFor('?fakeout&domain=0'), domainFor('', false)]) {
+      expect(off).toEqual({ on: false, rules: [], features: [] });
+    }
+  });
+
+  it('with ?domain=0 a look-away shows the plain banner, never warns and no domain starts', () => {
+    const run = runFor('?domain=0');
+    run.toFirstAd();
+    for (let i = 0; i < 12; i++) {
+      expect(glance(run)).toMatchObject({ banner: 'Please return your eyes to the ad', domain: null });
+    }
+    expect(run.out.stats.headTurns).toBe(12);
+  });
+
+  it('with ?fakeout it leaves GLOOP alone and applies to WRAPZILLA', () => {
+    const run = runFor('?fakeout');
+    run.toFirstAd();
+    for (let i = 0; i < 12; i++) {
+      expect(glance(run)).toMatchObject({ screen: 'ad1', banner: LOOK_AWAY, domain: null });
+    }
+    run.frame({ jumpTo: 3 }); // WRAPZILLA
+    expect(glance(run)).toMatchObject({ screen: 'ad3', banner: `${LOOK_AWAY} (warning 1 of 3)` });
+    glance(run);
+    glance(run);
+    expect(run.frame(AWAY).domain).toEqual({ phase: 'cast', elapsed: 0 });
   });
 });

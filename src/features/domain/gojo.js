@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // fighting stance, so its bones are reset to the bind pose and posed here.
 // The group's origin is at his feet and he faces +Z.
 
-const MODEL_URL = '/domain/gojo.glb';
+export const MODEL_URL = '/domain/gojo.glb';
 const POP_OVERSHOOT = 1.7;
 const ARRIVE_STRETCH = 1.4; // times his height as he snaps in, settling to 1
 const ARRIVE_FLICKERS = 2; // times he blinks out while snapping in

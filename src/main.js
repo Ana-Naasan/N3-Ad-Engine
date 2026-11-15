@@ -5,7 +5,8 @@ import { createTV } from './tv.js';
 import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
 import { createAttention } from './attention/index.js';
-import { LINEUP } from './attention/lineup.js';
+import { FAKEOUT } from './fakeout.js';
+import { DOMAIN } from './domain.js';
 import { RULES } from './attention/rules/index.js';
 import { SENSORS } from './sensors/index.js';
 import { FEATURES } from './features/index.js';
@@ -66,9 +67,23 @@ function calibrate(pose) {
   rlog('calibrate', { eyeHeight: +p.y.toFixed(3), yawDeg: +THREE.MathUtils.radToDeg(world.rotation.y).toFixed(1) });
 }
 
+// --- Holding the run while nobody can see it ---
+// With the headset off or a system menu up (the session isn't 'visible'), or
+// after leaving VR mid-run, the TV video pauses and run time stops, so no ad
+// plays out unseen and re-entering continues where it left off. Before the
+// first Enter VR the flat page runs, for key-jump testing.
+const MAX_FRAME_SECONDS = 0.1; // a longer gap between frames (a stall) counts as this long
+let enteredVR = false;
+
 renderer.xr.addEventListener('sessionstart', () => {
   calibrated = false;
+  enteredVR = true;
   const session = renderer.xr.getSession();
+  // Frames may stop altogether while hidden, so pause here rather than wait for one.
+  session.addEventListener('visibilitychange', () => {
+    rlog('visibility', { state: session.visibilityState });
+    if (session.visibilityState !== 'visible') tv.currentVideo?.pause();
+  });
   rlog('session-start', {
     enabledFeatures: session.enabledFeatures ?? 'unknown',
     frameRate: session.frameRate ?? 'unknown',
@@ -124,7 +139,6 @@ startButton.addEventListener('click', async () => {
   startButton.disabled = true;
   rlog('start-click');
   tv.primeAll();
-  for (const prime of ctx.primers) prime();
   let micMessage;
   try {
     await startMic();
@@ -143,12 +157,13 @@ startButton.addEventListener('click', async () => {
 // moved by calibration, so convert with world.worldToLocal / localToWorld when
 // placing things relative to the room.
 // ctx.tv exposes group (#10 shrinks it), screenMaterial and texture (#8's palm screens).
-// ctx.primers: a feature pushes a function here to unlock its own media; each
-// runs inside the Start tap, next to tv.primeAll().
-const ctx = { renderer, scene, camera, world, tv, primers: [] };
+const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
-const updateFeatures = FEATURES.map((setup) => setup(ctx));
-const attention = createAttention(LINEUP, RULES);
+// FAKEOUT adds a lineup, a rule and a feature only when the URL has ?fakeout.
+// DOMAIN adds a rule and a feature unless the URL has ?domain=0 or its media is missing.
+// Its feature is last: it hides the room.
+const updateFeatures = [...FEATURES, ...FAKEOUT.features, ...DOMAIN.features].map((setup) => setup(ctx));
+const attention = createAttention(FAKEOUT.lineup, [...RULES, ...FAKEOUT.rules, ...DOMAIN.rules]);
 
 // Latest `debug` values returned by sensors and features, merged into the status line.
 const moduleDebug = {};
@@ -174,6 +189,7 @@ function blankSignals(t, inVR) {
     micAvailable: false,
     clap: false,
     jumpTo: null,
+    pick: null, // null: no picker on the TV; false/true: the viewer has picked a video
     video: { t: 0, ended: false, failed: false },
   };
 }
@@ -185,17 +201,36 @@ let lastStatusLog = 0;
 let lastSnap = 0;
 let lastScreen = null;
 let peakMic = 0;
+let lastFrameTime = null;
+let runTime = 0; // seconds the run has been watchable: signals.t
+let wasHeld = false;
 const round = (x, places) => (typeof x === 'number' ? +x.toFixed(places) : x);
 
 renderer.setAnimationLoop((time, xrFrame) => {
   const inVR = Boolean(renderer.xr.isPresenting && xrFrame);
+  const frameSeconds = lastFrameTime === null ? 0 : (time - lastFrameTime) / 1000;
+  lastFrameTime = time;
+
+  const visibility = inVR ? (renderer.xr.getSession().visibilityState ?? 'visible') : null;
+  const hold = inVR ? visibility !== 'visible' : enteredVR;
+  if (hold !== wasHeld) {
+    wasHeld = hold;
+    rlog(hold ? 'run-held' : 'run-resumed', { visibility, at: +runTime.toFixed(2) });
+  }
+  if (hold) {
+    tv.currentVideo?.pause(); // the next watchable frame's tv.apply resumes it
+    renderer.render(scene, camera);
+    return;
+  }
+  runTime += THREE.MathUtils.clamp(frameSeconds, 0, MAX_FRAME_SECONDS);
+
   let pose = null;
   if (inVR) {
     pose = xrFrame.getViewerPose(renderer.xr.getReferenceSpace());
     if (pose && !calibrated) calibrate(pose);
   }
 
-  const signals = blankSignals(time / 1000, inVR);
+  const signals = blankSignals(runTime, inVR);
   const frame = { time, xrFrame, pose, inVR };
   for (const read of readSensors) collectDebug(read(signals, frame));
   if (signals.micLevel !== null) peakMic = Math.max(peakMic, signals.micLevel);

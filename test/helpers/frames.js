@@ -24,6 +24,7 @@ export function baseSignals(t) {
     micAvailable: false,
     clap: false,
     jumpTo: null,
+    pick: null,
   };
 }
 

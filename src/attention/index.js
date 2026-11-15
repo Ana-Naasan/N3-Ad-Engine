@@ -6,24 +6,30 @@
 // ./rules) get the signals and the current step, and their results are merged
 // here by fixed rules, never by registration order:
 //   - any `playing: false` pauses; seeks add up, clamped so video time >= 0
-//   - banner: lookAway > skip (hold-still) > gate > any other rule > the ad's own
+//   - banner: domain > lookAway > skip (hold-still) > gate > any other rule > the ad's own
 //   - target 'palms', tvDim and tint 'red' apply if any rule sets them
 //   - only the rule with id 'skip' sets `skip`; `gate` comes from any rule
-//   - `domain` { phase: 'cast' | 'ads', elapsed } comes from any rule (null
-//     otherwise). A rule that sets it owns that frame: apart from stats, only
-//     its result and force-pass's count, so nothing else pauses, draws or passes
 //   - any `passed` advances to the next step (never out of the finale)
 //   - `stats` {headTurns, chaseMetres} are amounts to add, until the finale
+//   - a rule that sets `domain` ({ phase, elapsed }, see ./rules/domain.js) owns
+//     the frame: every other rule's result but force-pass's is dropped, stats
+//     included. The output carries it; `domain` is null otherwise.
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
 // the finale.
+// signals.pick: null when the card is the "Pinch to play" card; with a video
+// picker on the TV, false until the viewer picks a video and true once they have.
 //
 // The `ad` a rule receives is the lineup entry plus `index` (position in the
 // lineup, -1 for the card), `adIndex` (1–4, 0 before the ads) and `startedAt`.
 import { LINEUP, FAILED_AD_SECONDS } from './lineup.js';
 import { RULES } from './rules/index.js';
 
-const BANNER_PRIORITY = ['lookAway', 'skip', 'gate'];
+const BANNER_PRIORITY = ['domain', 'lookAway', 'skip', 'gate'];
 const CARD = { kind: 'card', screen: 'card' };
+
+// In the finale, a select started there and held this long restarts the run
+// (back to the card, fresh stats), so takes can follow each other in VR.
+export const RESTART_SECONDS = 2;
 
 export function createAttention(lineup = LINEUP, rules = RULES) {
   const ruleFns = rules.map((r) => ({ id: r.id, update: r.createRule() }));
@@ -32,13 +38,24 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
   let lastT = null;
   let usedJump = false;
   let frozen = false;
-  const stats = { adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 };
+  let restartArmed = false; // a select started during the finale
+  const freshStats = () => ({ adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 });
+  let stats = freshStats();
 
   function goTo(index, t) {
     const entry = lineup[index];
     if (!entry) return;
     step = { ...entry, index, adIndex: ads.indexOf(entry) + 1, startedAt: t };
+    restartArmed = false;
     if (entry.finale) frozen = true;
+  }
+
+  function restart(t) {
+    step = { ...CARD, index: -1, adIndex: 0, startedAt: t };
+    stats = freshStats();
+    usedJump = false;
+    frozen = false;
+    restartArmed = false;
   }
 
   function update(signals) {
@@ -54,11 +71,17 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
 
     const before = step;
 
-    // Built-in steps: the card waits for a select; content plays for its seconds.
-    if (step.kind === 'card' && signals.selectStarted) goTo(0, t);
+    // Built-in steps: the card waits for the viewer to start their video; content
+    // plays for its seconds. With a picker on the TV (signals.pick is a boolean)
+    // selects are its clicks, so only a pick starts; otherwise any select does.
+    const started = signals.pick == null ? signals.selectStarted : signals.pick;
+    if (step.kind === 'card' && started) goTo(0, t);
     else if (step.kind === 'content' && t - step.startedAt >= step.seconds) goTo(step.index + 1, t);
 
     let results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
+    if (results.some(({ r }) => r.domain)) {
+      results = results.filter(({ id, r }) => r.domain || id === 'forcePass');
+    }
 
     if (!frozen) {
       for (const { r } of results) {
@@ -67,16 +90,13 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       }
     }
 
-    // The domain owns its frames (the ad wall is loud enough to pass the gate).
-    if (results.some(({ r }) => r.domain)) {
-      results = results.filter(({ id, r }) => r.domain || id === 'forcePass');
-    }
-
     // Moving on: a jump, a pass, or a no-gimmick ad that ended or failed.
     const { jumpTo } = signals;
     const video = signals.video || {};
     if (step.finale) {
-      // The finale loops forever and never advances.
+      // The finale loops forever and never advances; a held select restarts.
+      if (signals.selectStarted) restartArmed = true;
+      if (restartArmed && signals.selectHeld >= RESTART_SECONDS) restart(t);
     } else if (Number.isInteger(jumpTo) && jumpTo >= 1 && jumpTo <= ads.length) {
       goTo(lineup.indexOf(ads[jumpTo - 1]), t);
       usedJump = true;
@@ -98,8 +118,8 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       banner: step.banner ?? null,
       skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: a jump count
       gate: { visible: false, level: 0, line: null, label: null },
-      domain: null,
       finale: Boolean(step.finale),
+      domain: null,
       stats: { ...stats },
       usedJump,
       adIndex: step.adIndex,

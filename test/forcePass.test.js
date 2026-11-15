@@ -41,10 +41,29 @@ describe('force-pass', () => {
     expect(run.out.screen).toBe('ad2');
   });
 
-  it('does nothing in the finale', () => {
+  it('a select held with the palms over the eyes passes nothing', () => {
+    const run = createRun();
+    run.toFirstAd();
+    run.run(3, (e) => ({ ...holding(e), palmsUp: true }));
+    expect(run.out.screen).toBe('ad1');
+  });
+
+  it('raising the palms mid-hold cancels it, even once they come down', () => {
+    const run = createRun();
+    run.toFirstAd();
+    run.run(1, holding);
+    run.run(0.5, (e) => ({ selectHeld: 1 + e, palmsUp: true }));
+    run.run(2, (e) => ({ selectHeld: 1.5 + e }));
+    expect(run.out.screen).toBe('ad1');
+    run.run(2, holding); // a new select once the palms are down still works
+    expect(run.frame({ selectHeld: 2 }).screen).toBe('ad2');
+  });
+
+  it('never passes the finale (a 2 s hold there restarts instead: see restart.test.js)', () => {
     const run = createRun();
     run.frame({ jumpTo: 4 });
-    run.run(10, holding);
+    run.run(1.5, holding);
+    run.run(5);
     expect(run.out.screen).toBe('ad4');
   });
 });

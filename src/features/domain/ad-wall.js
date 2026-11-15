@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // the ads can't drift apart. The group's origin is the viewer's head; the
 // wall closes in on it as `progress` goes from 0 to 1.
 
-const VIDEO_URL = '/domain/ads.mp4';
+export const VIDEO_URL = '/domain/ads.mp4';
 const GRID_COLS = 3;
 const GRID_ROWS = 2;
 const CELLS = GRID_COLS * GRID_ROWS;
@@ -94,14 +94,19 @@ export function createAdWall({ muted = false } = {}) {
       video.play().then(restore, restore);
     },
 
+    // Stops the video while the run is held; the next update(true, …) resumes it.
+    pause() {
+      video.pause();
+    },
+
     // on: whether the wall shows. seconds: since it appeared. progress: 0..1 through the domain.
-    update(on, seconds, progress) {
+    // volume: 0..1, its sound.
+    update(on, seconds, progress, volume = 1) {
       group.visible = on;
       if (on !== playing) {
         playing = on;
         if (on) {
           video.currentTime = 0;
-          video.volume = 1;
           video.play().catch((e) => {
             failed = true;
             console.warn('ad wall video failed to play', e.name, e.message);
@@ -111,6 +116,8 @@ export function createAdWall({ muted = false } = {}) {
         }
       }
       if (!on) return;
+      if (video.paused && !failed) video.play().catch(() => {}); // after pause(): the run was held
+      video.volume = volume;
       group.scale.setScalar(THREE.MathUtils.lerp(SCALE_FAR, SCALE_NEAR, progress));
       for (const { mesh, order } of screens) {
         const pop = THREE.MathUtils.clamp((seconds - order * POP_STAGGER) / POP_SECONDS, 0, 1);
