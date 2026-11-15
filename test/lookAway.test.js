@@ -174,7 +174,7 @@ describe('where look-away does not apply', () => {
     run.frame({ jumpTo: 4 });
     run.video.t = 5;
     unaffected(run, 7);
-    expect(run.out.banner).toBe('Your video will resume after 2 more ads');
+    expect(run.out.banner).toBe('Pinch or pull the trigger to go back to your video'); // the finale's, from 3 s in
   });
 
   it('the 1 s of content before the ads', () => {

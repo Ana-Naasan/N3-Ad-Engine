@@ -31,13 +31,18 @@ import { RULES } from './rules/index.js';
 const BANNER_PRIORITY = ['domain', 'lookAway', 'skip', 'gate'];
 const CARD = { kind: 'card', screen: 'card' };
 
-// In the finale, a select started there and held this long restarts the run
-// (back to the card, fresh stats), so takes can follow each other in VR.
+// The finale ends in two steps, both a select (a pinch or a controller trigger):
+//   1. GO_BACK_AFTER_SECONDS in, the banner offers the way back to the video. A
+//      select that starts from then on brings up the "Screen Time Limit Reached"
+//      pop-up (output.popup): the TV grows back as if the video resumes, and the
+//      pop-up covers it. Nothing brings it up on its own.
+//   2. With the pop-up up, a new select held RESTART_SECONDS restarts the run
+//      (back to the card, fresh stats), so takes can follow each other in VR.
+//      The select that brought the pop-up up never restarts.
+export const GO_BACK_AFTER_SECONDS = 3;
 export const RESTART_SECONDS = 2;
-
-// This long into the finale, the "Screen Time Limit Reached" pop-up comes up
-// (output.popup): the TV grows back as if the video resumes, and the pop-up covers it.
-export const POPUP_AFTER_SECONDS = 6;
+export const GO_BACK_BANNER = 'Pinch or pull the trigger to go back to your video';
+export const WATCH_AGAIN_BANNER = 'Hold the pinch or trigger for 2 s to watch again';
 
 export function createAttention(lineup = LINEUP, rules = RULES) {
   const ruleFns = rules.map((r) => ({ id: r.id, update: r.createRule() }));
@@ -46,7 +51,8 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
   let lastT = null;
   let usedJump = false;
   let frozen = false;
-  let restartArmed = false; // a select started during the finale
+  let popup = false; // the viewer went back to the video in the finale
+  let restartArmed = false; // a select started while the pop-up was up
   let played = 0; // seconds the current content step's video has really played
   let lastPlayedAt = 0; // when it last played (or the step started)
   const freshStats = () => ({ adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 });
@@ -57,6 +63,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     if (!entry) return;
     step = { ...entry, index, adIndex: ads.indexOf(entry) + 1, startedAt: t };
     restartArmed = false;
+    popup = false;
     played = 0;
     lastPlayedAt = t;
     if (entry.finale) frozen = true;
@@ -68,6 +75,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     usedJump = false;
     frozen = false;
     restartArmed = false;
+    popup = false;
   }
 
   function update(signals) {
@@ -111,8 +119,12 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     // Moving on: a jump, a pass, or a no-gimmick ad that ended or failed.
     const { jumpTo } = signals;
     if (step.finale) {
-      // The finale loops forever and never advances; a held select restarts.
-      if (signals.selectStarted) restartArmed = true;
+      // The finale loops forever and never advances. A select brings the pop-up
+      // up; with it up, a new select that is held restarts.
+      if (signals.selectStarted) {
+        if (popup) restartArmed = true;
+        else if (t - step.startedAt >= GO_BACK_AFTER_SECONDS) popup = true;
+      }
       if (restartArmed && signals.selectHeld >= RESTART_SECONDS) restart(t);
     } else if (Number.isInteger(jumpTo) && jumpTo >= 1 && jumpTo <= ads.length) {
       goTo(lineup.indexOf(ads[jumpTo - 1]), t);
@@ -136,12 +148,17 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: a jump count
       gate: { visible: false, level: 0, line: null, label: null },
       finale: Boolean(step.finale),
-      popup: Boolean(step.finale) && t - step.startedAt >= POPUP_AFTER_SECONDS,
+      popup,
       domain: null,
       stats: { ...stats },
       usedJump,
       adIndex: step.adIndex,
     };
+
+    if (step.finale) {
+      if (popup) out.banner = WATCH_AGAIN_BANNER;
+      else if (t - step.startedAt >= GO_BACK_AFTER_SECONDS) out.banner = GO_BACK_BANNER;
+    }
 
     // A new step starts clean: results computed for the old one don't apply.
     if (step !== before) return out;

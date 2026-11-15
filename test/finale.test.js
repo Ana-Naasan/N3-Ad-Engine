@@ -7,6 +7,7 @@ import { createRun, DT } from './helpers/frames.js';
 import { RULES } from '../src/attention/rules/index.js';
 
 const FINALE_BANNER = 'Your video will resume after 2 more ads';
+const GO_BACK_BANNER = 'Pinch or pull the trigger to go back to your video'; // from 3 s in
 
 // Runs frames until `done(out)` holds and returns that frame's time and output.
 function until(run, done, signals = () => ({})) {
@@ -55,13 +56,13 @@ describe('finale entry', () => {
     expect(adTime).toBeCloseTo(entry.t - 23, 9); // every other second up to entry
 
     run.run(30, { bump: true, micLevel: 0.9 });
-    expect(run.out).toMatchObject({ screen: 'ad4', finale: true, banner: FINALE_BANNER });
+    expect(run.out).toMatchObject({ screen: 'ad4', finale: true, banner: GO_BACK_BANNER });
     expect(run.out.stats).toEqual(entry.out.stats);
   });
 
   it('in the finale, looking anywhere or raising palms changes nothing', () => {
     const run = createRun();
-    run.frame({ jumpTo: 4 });
+    run.frame({ jumpTo: 4 }); // the finale starts on this frame, one DT before e = 0
     const look = (e) => {
       if (e < 7) return { headAngle: 90 }; // well past 3 s away, twice
       if (e < 10) return { palmsUp: true };
@@ -69,7 +70,7 @@ describe('finale entry', () => {
     };
     for (let e = 0; e < 14; e += DT) {
       expect(run.frame(look(e))).toMatchObject({
-        screen: 'ad4', finale: true, banner: FINALE_BANNER,
+        screen: 'ad4', finale: true, banner: e + DT < 3 ? FINALE_BANNER : GO_BACK_BANNER,
         playing: true, seek: 0, target: 'tv', tvDim: false, tint: null,
       });
     }
