@@ -174,7 +174,7 @@ Not decided:
 
 Bader chose Higgsfield and asked for the setup. On this Mac:
 
-- `@higgsfield/cli` 1.2.2 is installed globally (`higgsfield`, `higgs`, `hf`). Bader signed in. The workspace `Private` is selected: ultra plan, 10 credits at 14:45.
+- `@higgsfield/cli` 1.2.2 is installed globally (`higgsfield`, `higgs`, `hf`). Bader signed in and a workspace is selected.
 - The nine `higgsfield-*` skills are in `~/.agents/skills`, linked for Claude Code and Codex. They are not in this repo.
 - The model `seed_audio` (Seed Audio 1.0) takes a prompt and `--audio-references`, a sample of a voice. `higgsfield generate cost seed_audio --prompt "<the line>"` reports 0.5 credits. No job has been created and nothing has been uploaded.
 - `higgsfield voices list` shows 114 preset voices and no cloned one. The CLI has no command that creates a saved cloned voice.
