@@ -2,13 +2,18 @@ import * as THREE from 'three';
 
 // The TV: a 1.6 x 0.9 m screen in a thin bezel, showing the "Pinch to play"
 // card or one of several videos.
+//
+// With the YouTube mirror (src/features/picker.js) the card is the mirror's
+// live texture instead, and the content is the viewer's pick: a featured
+// video's own file, or the mirror itself.
 
 const VIDEO_NAMES = ['content', 'ad1', 'ad2', 'ad3', 'ad4'];
+const videoUrl = (name) => `/videos/${name}.mp4`;
 const TV_DIM_BRIGHTNESS = 0.2; // screen brightness while the ad plays on the palms
 
 function makeVideo(name) {
   const video = document.createElement('video');
-  video.src = `/videos/${name}.mp4`;
+  video.src = videoUrl(name);
   video.playsInline = true;
   video.preload = 'auto';
   video.crossOrigin = 'anonymous';
@@ -54,17 +59,30 @@ export function createTV() {
 
   const videos = Object.fromEntries(VIDEO_NAMES.map((n) => [n, makeVideo(n)]));
   let shown = 'card';
-  let current = null; // null while the card shows
+  let current = null; // null while the card or the live texture shows
   let playFailed = false;
+  let live = null; // the YouTube mirror's texture, while there is one
+  let contentLive = false; // the content screen is the mirror (a pick with no file of its own)
+  let contentId = 'content'; // the content's file is /videos/<contentId>.mp4; null when it is the mirror
+
+  function showMap(map) {
+    if (screenMaterial.map === map) return;
+    screenMaterial.map = map;
+    screenMaterial.needsUpdate = true;
+  }
 
   function switchTo(name) {
     current?.video.pause();
     shown = name;
     playFailed = false;
-    current = videos[name] ?? null;
+    current = (name === 'content' && contentLive ? null : videos[name]) ?? null;
     if (current) current.video.currentTime = 0; // every screen starts from the top
-    screenMaterial.map = current ? current.texture : cardTexture;
-    screenMaterial.needsUpdate = true;
+    showMap(current ? current.texture : live ?? cardTexture);
+  }
+
+  function setContentUrl(url) {
+    const { video } = videos.content;
+    if (new URL(video.src, location.href).pathname !== url) video.src = url;
   }
 
   function play(video) {
@@ -99,6 +117,39 @@ export function createTV() {
       // An ended, non-looping video stays ended: play() would restart it.
       if (playing && video.paused && !video.ended && !playFailed) play(video);
       else if (!playing && !video.paused) video.pause();
+    },
+
+    // The mirror's texture stands in for the card (null: the "Pinch to play" card).
+    setLive(texture) {
+      live = texture;
+      if (!current) showMap(live ?? cardTexture);
+    },
+
+    // The viewer's pick, set before the content screen shows. With an id, the
+    // content is the featured video's file, with sound; without, it's the mirror.
+    pickContent(id) {
+      contentId = id ?? null;
+      contentLive = !id;
+      if (id) setContentUrl(videoUrl(id));
+    },
+
+    // A new run: the content is the placeholder again until the next pick.
+    resetContent() {
+      contentId = 'content';
+      contentLive = false;
+      setContentUrl(videoUrl('content'));
+    },
+
+    // Names the content's file, /videos/<contentId>.mp4: a featured video's YouTube
+    // id, or 'content' for the placeholder. null when the content is the mirror,
+    // which has no file and no sound.
+    get contentId() {
+      return contentId;
+    },
+
+    // What the content screen shows, for the finale's postcard.
+    get contentTexture() {
+      return contentLive && live ? live : videos.content.texture;
     },
 
     get currentVideo() {
