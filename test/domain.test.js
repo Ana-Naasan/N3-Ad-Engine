@@ -156,7 +156,7 @@ describe('the domain', () => {
       expect(out.domain).not.toBe(null);
     }
     run.frame(); // the domain ends: WRAPZILLA again, its gate back
-    expect(run.out).toMatchObject({ screen: 'ad3', domain: null, banner: 'Say WRAPZILLA to continue' });
+    expect(run.out).toMatchObject({ screen: 'ad3', domain: null, banner: 'Say FLEX TAPE to continue' });
   });
 
   it('counts as time on ads', () => {
