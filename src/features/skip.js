@@ -1,10 +1,12 @@
 import * as THREE from 'three';
-import { FLY_OUT_S, quatAngleDeg } from '../attention/rules/skip.js';
+import { FLY_OUT_S, HOLD_S, quatAngleDeg } from '../attention/rules/skip.js';
 
 // The GRIN+ Skip button: flies out of the TV to a spot within reach, jumps to
-// a new spot each time output.skip.jump goes up, and draws the locked label
-// ("Skip available in 5 seconds"), the hold-still progress ring and the amber
-// enabled button. It owns the button's position and shares it as ctx.skip
+// a new spot each time output.skip.jump goes up, and draws the locked label,
+// the hold-still progress ring and the amber enabled button. The locked label
+// counts the hold down ("Skip available in 5 seconds" … "1 second"), and reads
+// "You moved. Starting over." for MOVED_S each time the hold restarts: the
+// viewer is looking at the button, not at the banner under the TV. It owns the button's position and shares it as ctx.skip
 // (scene space) for the skipProximity sensor.
 //
 // Spots are in the reachable zone, measured from the head (scene space):
@@ -31,6 +33,15 @@ const LABEL_W_M = 0.32;
 const LABEL_H_M = 0.07;
 const RING_M = 0.05;
 const RING_GAP_M = 0.012;
+
+const MOVED_TEXT = 'You moved. Starting over.';
+const MOVED_S = 1; // how long the label says so after the hold restarts
+
+// The locked label: the whole seconds left of the hold.
+function lockedText(progress) {
+  const left = Math.max(1, Math.ceil(HOLD_S * (1 - progress)));
+  return `Skip available in ${left} second${left === 1 ? '' : 's'}`;
+}
 
 const LABELS = {
   chase: { text: 'Skip ▸', bg: AMBER, fg: DARK, fontPx: 64 },
@@ -115,7 +126,9 @@ export default function skip(ctx) {
 
   let lastState = 'hidden';
   let lastJump = 0;
-  let labelKind = null;
+  let labelDrawn = null; // kind and text of the label on the canvas
+  let lockedProgress = null; // last frame's hold progress while locked, else null
+  let movedUntil = -Infinity; // the label says "You moved" until this time
   let ringDrawn = -1;
   let holdPose = null; // for the drift readout only; the rule owns the real hold
 
@@ -186,9 +199,23 @@ export default function skip(ctx) {
     shared.visible = true;
 
     const kind = state === 'locked' ? 'locked' : state === 'enabled' ? 'enabled' : 'chase';
-    if (kind !== labelKind) {
-      labelKind = kind;
-      const wM = drawLabel(label, LABELS[kind]);
+    let text = LABELS[kind].text;
+    if (state === 'locked') {
+      // The rule restarts the hold when the head moves: progress drops, and is
+      // exactly 0 on the restart frame. The first locked frame is not a restart.
+      if (lockedProgress !== null && (progress < lockedProgress || progress === 0)) {
+        movedUntil = signals.t + MOVED_S;
+      }
+      lockedProgress = progress;
+      text = signals.t < movedUntil ? MOVED_TEXT : lockedText(progress);
+    } else {
+      lockedProgress = null;
+      movedUntil = -Infinity;
+    }
+    const labelKey = `${kind}:${text}`;
+    if (labelKey !== labelDrawn) {
+      labelDrawn = labelKey;
+      const wM = drawLabel(label, { ...LABELS[kind], text });
       ring.mesh.position.x = -(wM / 2 + RING_GAP_M + RING_M / 2);
     }
     ring.mesh.visible = state === 'locked';
