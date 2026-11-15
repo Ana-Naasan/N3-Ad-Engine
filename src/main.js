@@ -4,9 +4,9 @@ import { buildRoom } from './room.js';
 import { createTV } from './tv.js';
 import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
-// TODO(#4): replace with `import { createAttention } from './attention/index.js';`
-// and `import { LINEUP } from './attention/lineup.js';`, then delete the stand-in.
-import { createAttention } from './attention-stand-in.js';
+import { createAttention } from './attention/index.js';
+import { LINEUP } from './attention/lineup.js';
+import { RULES } from './attention/rules/index.js';
 import { SENSORS } from './sensors/index.js';
 import { FEATURES } from './features/index.js';
 
@@ -145,7 +145,7 @@ startButton.addEventListener('click', async () => {
 const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
 const updateFeatures = FEATURES.map((setup) => setup(ctx));
-const attention = createAttention(); // TODO(#4): createAttention(LINEUP)
+const attention = createAttention(LINEUP, RULES);
 
 // Latest `debug` values returned by sensors and features, merged into the status line.
 const moduleDebug = {};
