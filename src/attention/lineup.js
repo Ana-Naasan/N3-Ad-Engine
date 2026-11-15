@@ -14,7 +14,7 @@
 
 export const CONTENT_SECONDS = 8; // the video plays this long before the first ad (was 1)
 export const BETWEEN_ADS_SECONDS = 5; // and this long again after each ad is beaten
-export const STALLED_CONTENT_SECONDS = 10; // a video not playing this long lets the next ad start
+export const STALLED_CONTENT_SECONDS = 10; // a video not playing this long: back to the card before the first ad, else the next ad starts
 export const FAILED_AD_SECONDS = 10; // a failed no-gimmick ad ends this long after it starts
 
 const RESUME = { kind: 'content', screen: 'content', seconds: BETWEEN_ADS_SECONDS };

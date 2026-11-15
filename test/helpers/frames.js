@@ -95,7 +95,11 @@ export function createRun({ lineup = LINEUP, rules } = {}) {
   // Shortcut: pinch on the card, then let the content play out.
   run.toFirstAd = () => {
     run.frame({ selectStarted: true });
-    while (run.out.screen !== 'ad1') run.frame();
+    const giveUp = run.t + 60;
+    while (run.out.screen !== 'ad1') {
+      if (run.t > giveUp) throw new Error(`toFirstAd: still on '${run.out.screen}' after 60 s`);
+      run.frame();
+    }
     return run.out;
   };
 

@@ -10,6 +10,7 @@ const fakeRule = (id, partial, when = () => true) => ({
   id,
   createRule: () => (signals, ad) => (when(signals, ad) ? partial : {}),
 });
+const onAds = (signals, ad) => ad.kind === 'ad';
 
 describe('card and content', () => {
   it('shows the "Pinch to play" card, paused, until the first select', () => {
@@ -161,8 +162,8 @@ describe('merging rule results', () => {
 
   it('any pause wins and seeks add up', () => {
     const rules = [
-      fakeRule('a', { playing: true, seek: -1 }),
-      fakeRule('b', { playing: false, seek: -2 }),
+      fakeRule('a', { playing: true, seek: -1 }, onAds),
+      fakeRule('b', { playing: false, seek: -2 }, onAds), // on ads only: a paused first video goes back to the card
     ];
     const run = createRun({ rules });
     run.toFirstAd();
