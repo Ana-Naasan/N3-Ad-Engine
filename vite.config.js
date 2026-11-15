@@ -46,9 +46,13 @@ function parseSession(value) {
   return { timestamp, usedJump, stats: clean };
 }
 
+const HISTORY_LENGTH = 20; // running totals kept for the board's sparklines
+
 // Totals over the sessions file. Skips unreadable lines and key-jump test runs.
+// `history` holds the running totals after each of the last HISTORY_LENGTH sessions, oldest first.
 function sessionTotals() {
   const totals = { sessions: 0, adTime: 0, videoTime: 0, ratio: null, headTurns: 0, chaseMetres: 0 };
+  const history = [];
   let text = '';
   try {
     text = fs.readFileSync(SESSIONS_FILE, 'utf8');
@@ -69,9 +73,12 @@ function sessionTotals() {
     totals.videoTime += session.stats.videoTime;
     totals.headTurns += session.stats.headTurns;
     totals.chaseMetres += session.stats.chaseMetres;
+    totals.ratio = totals.videoTime > 0 ? totals.adTime / totals.videoTime : null;
+    const { sessions, ratio, headTurns, chaseMetres } = totals;
+    history.push({ sessions, ratio, headTurns, chaseMetres });
+    if (history.length > HISTORY_LENGTH) history.shift();
   }
-  if (totals.videoTime > 0) totals.ratio = totals.adTime / totals.videoTime;
-  return totals;
+  return { ...totals, history };
 }
 
 // Dev-only endpoints the headset posts to (see src/remote-log.js).

@@ -22,7 +22,8 @@ export async function postSession(summary) {
 }
 
 // Totals over logged sessions, key-jump runs left out:
-// { sessions, adTime, videoTime, ratio (ad / video, null when no video time), headTurns, chaseMetres }.
+// { sessions, adTime, videoTime, ratio (ad / video, null when no video time), headTurns, chaseMetres,
+//   history: running { sessions, ratio, headTurns, chaseMetres } after each recent session, oldest first }.
 // Throws when the server is unreachable or answers with something else.
 export async function fetchTotals() {
   const res = await fetch('/api/totals', { cache: 'no-store' });
@@ -32,5 +33,6 @@ export async function fetchTotals() {
     if (typeof totals?.[key] !== 'number') throw new Error(`GET /api/totals: no number for ${key}`);
   }
   if (totals.ratio !== null && typeof totals.ratio !== 'number') throw new Error('GET /api/totals: bad ratio');
+  if (!Array.isArray(totals.history)) throw new Error('GET /api/totals: no history');
   return totals;
 }
