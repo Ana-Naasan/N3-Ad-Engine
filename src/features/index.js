@@ -17,6 +17,7 @@ import gateMeter from './gate-meter.js';
 import finale from './finale.js';
 import sessionPost from './session-post.js';
 import kpiBoard from './kpi-board.js';
+import domain from './domain.js';
 import debugPanel from './debug-panel.js';
 
 export const FEATURES = [
@@ -29,5 +30,6 @@ export const FEATURES = [
   finale, // #10
   sessionPost, // #11
   kpiBoard, // #11
+  domain, // after everything else that draws in `world`: it hides the room
   debugPanel,
 ];

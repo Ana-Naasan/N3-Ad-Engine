@@ -124,6 +124,7 @@ startButton.addEventListener('click', async () => {
   startButton.disabled = true;
   rlog('start-click');
   tv.primeAll();
+  for (const prime of ctx.primers) prime();
   let micMessage;
   try {
     await startMic();
@@ -142,7 +143,9 @@ startButton.addEventListener('click', async () => {
 // moved by calibration, so convert with world.worldToLocal / localToWorld when
 // placing things relative to the room.
 // ctx.tv exposes group (#10 shrinks it), screenMaterial and texture (#8's palm screens).
-const ctx = { renderer, scene, camera, world, tv };
+// ctx.primers: a feature pushes a function here to unlock its own media; each
+// runs inside the Start tap, next to tv.primeAll().
+const ctx = { renderer, scene, camera, world, tv, primers: [] };
 const readSensors = SENSORS.map((setup) => setup(ctx));
 const updateFeatures = FEATURES.map((setup) => setup(ctx));
 const attention = createAttention(LINEUP, RULES);

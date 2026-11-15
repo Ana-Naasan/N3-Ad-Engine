@@ -9,6 +9,9 @@
 //   - banner: lookAway > skip (hold-still) > gate > any other rule > the ad's own
 //   - target 'palms', tvDim and tint 'red' apply if any rule sets them
 //   - only the rule with id 'skip' sets `skip`; `gate` comes from any rule
+//   - `domain` { phase: 'cast' | 'ads', elapsed } comes from any rule (null
+//     otherwise). A rule that sets it owns that frame: apart from stats, only
+//     its result and force-pass's count, so nothing else pauses, draws or passes
 //   - any `passed` advances to the next step (never out of the finale)
 //   - `stats` {headTurns, chaseMetres} are amounts to add, until the finale
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
@@ -55,13 +58,18 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     if (step.kind === 'card' && signals.selectStarted) goTo(0, t);
     else if (step.kind === 'content' && t - step.startedAt >= step.seconds) goTo(step.index + 1, t);
 
-    const results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
+    let results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
 
     if (!frozen) {
       for (const { r } of results) {
         stats.headTurns += r.stats?.headTurns ?? 0;
         stats.chaseMetres += r.stats?.chaseMetres ?? 0;
       }
+    }
+
+    // The domain owns its frames (the ad wall is loud enough to pass the gate).
+    if (results.some(({ r }) => r.domain)) {
+      results = results.filter(({ id, r }) => r.domain || id === 'forcePass');
     }
 
     // Moving on: a jump, a pass, or a no-gimmick ad that ended or failed.
@@ -90,6 +98,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       banner: step.banner ?? null,
       skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: a jump count
       gate: { visible: false, level: 0, line: null, label: null },
+      domain: null,
       finale: Boolean(step.finale),
       stats: { ...stats },
       usedJump,
@@ -107,6 +116,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       if (r.tvDim) out.tvDim = true;
       if (r.tint === 'red') out.tint = 'red';
       if (r.gate) out.gate = { ...out.gate, ...r.gate };
+      if (r.domain) out.domain = r.domain;
       if (id === 'skip' && r.skip) out.skip = { ...out.skip, ...r.skip };
     }
     out.seek = Math.max(seek, -(video.t ?? 0)) || 0;
