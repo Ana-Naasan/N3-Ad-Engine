@@ -1,5 +1,5 @@
 // Core behaviour of the attention module: the lineup, ad endings, merging
-// rule results and stats. Spec values (1 s, 10 s) are written out literally
+// rule results and stats. Spec values (8 s, 10 s) are written out literally
 // so changing a constant makes a test fail.
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
@@ -20,13 +20,13 @@ describe('card and content', () => {
     expect(out.adIndex).toBe(0);
   });
 
-  it('plays 1 s of content after the first select, then cuts to GLOOP', () => {
+  it('plays 8 s of content after the first select, then cuts to GLOOP', () => {
     const run = createRun();
     run.run(2); // idle on the card first
     let out = run.frame({ selectStarted: true });
     expect(out.screen).toBe('content');
     expect(out.playing).toBe(true);
-    out = run.run(1 - DT);
+    out = run.run(8 - DT);
     expect(out.screen).toBe('content');
     out = run.frame();
     expect(out.screen).toBe('ad1');
@@ -39,7 +39,7 @@ describe('card and content', () => {
     run.frame({ selectStarted: true });
     run.run(0.5);
     run.frame({ selectStarted: true });
-    expect(run.run(0.5 - DT).screen).toBe('ad1');
+    expect(run.run(7.5 - DT).screen).toBe('ad1');
   });
 });
 
@@ -51,7 +51,7 @@ describe('ads without a gimmick (GLOOP)', () => {
     out = run.run(10 - DT);
     expect(out.screen).toBe('ad1');
     out = run.run(2 * DT); // the fake video reports ended at 10 s
-    expect(out.screen).toBe('ad2');
+    expect(out.screen).toBe('content');
   });
 
   it('ends 10 s after it starts if the video failed', () => {
@@ -60,7 +60,7 @@ describe('ads without a gimmick (GLOOP)', () => {
     run.video.failed = true;
     run.video.t = 0;
     expect(run.run(10 - DT).screen).toBe('ad1');
-    expect(run.run(2 * DT).screen).toBe('ad2');
+    expect(run.run(2 * DT).screen).toBe('content');
   });
 });
 
@@ -70,19 +70,23 @@ describe('gimmick ads', () => {
     const passer = fakeRule('test', { passed: true }, () => pass);
     const run = createRun({ rules: [passer] });
     run.toFirstAd();
-    run.run(10.5); // GLOOP ends
-    expect(run.out.screen).toBe('ad2');
+    run.run(10.5); // GLOOP ends, the video resumes
+    expect(run.out.screen).toBe('content');
+    expect(run.run(5).screen).toBe('ad2');
     expect(run.out.loop).toBe(true);
     expect(run.run(35).screen).toBe('ad2'); // video wraps, ad stays
     pass = true;
     run.frame();
     pass = false;
-    expect(run.out.screen).toBe('ad3');
+    expect(run.out.screen).toBe('content');
+    expect(run.run(5).screen).toBe('ad3');
     expect(run.out.loop).toBe(true);
     expect(run.run(35).screen).toBe('ad3');
     pass = true;
     run.frame();
-    expect(run.out.screen).toBe('ad4');
+    pass = false;
+    expect(run.out.screen).toBe('content');
+    expect(run.run(5).screen).toBe('ad4');
   });
 
   it('a failed video does not end a gimmick ad', () => {
@@ -221,7 +225,7 @@ describe('merging rule results', () => {
     run.toFirstAd();
     pass = true;
     const out = run.frame();
-    expect(out.screen).toBe('ad2');
+    expect(out.screen).toBe('content');
     expect(out.playing).toBe(true);
     expect(out.seek).toBe(0);
   });
@@ -236,7 +240,7 @@ describe('stats', () => {
     paused = true;
     run.run(3);
     const { stats } = run.out;
-    expect(stats.videoTime).toBeCloseTo(1, 5);
+    expect(stats.videoTime).toBeCloseTo(8, 5);
     expect(stats.adTime).toBeCloseTo(5, 5);
     expect(stats.headTurns).toBe(0);
     expect(stats.chaseMetres).toBe(0);

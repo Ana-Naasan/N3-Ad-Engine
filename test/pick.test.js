@@ -14,13 +14,13 @@ describe('card with a picker (signals.pick)', () => {
     expect(out.playing).toBe(false);
   });
 
-  it('plays 1 s of content from the pick, then cuts to GLOOP', () => {
+  it('plays 8 s of content from the pick, then cuts to GLOOP', () => {
     const run = createRun();
     run.run(2, { pick: false });
     let out = run.frame({ pick: true });
     expect(out.screen).toBe('content');
     expect(out.playing).toBe(true);
-    out = run.run(1 - DT, { pick: true });
+    out = run.run(8 - DT, { pick: true });
     expect(out.screen).toBe('content');
     out = run.frame({ pick: true });
     expect(out.screen).toBe('ad1');

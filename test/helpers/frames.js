@@ -1,6 +1,9 @@
 // Frame helper: drives the attention module one frame at a time and fakes
 // the TV's video clock. It applies the output's play, pause, seek and loop
-// to a fake video time and reports `ended` at the video's length.
+// to a fake video time and reports `ended` at the video's length, and
+// `playing` while the last output played it. Like the TV, the content carries
+// on where an ad cut in; every other screen starts from the top.
+// signals.video overrides the fake clock's fields (e.g. { playing: false }).
 import { createAttention } from '../../src/attention/index.js';
 import { LINEUP } from '../../src/attention/lineup.js';
 
@@ -39,6 +42,7 @@ export function createRun({ lineup = LINEUP, rules } = {}) {
   const attention = rules ? createAttention(lineup, rules) : createAttention(lineup);
   const video = { t: 0, ended: false, failed: false };
   const run = { t: 0, out: null, video, minVideoTime: 0, seeks: [] };
+  let contentT = 0; // where the content was when an ad cut in
 
   function advanceVideo(dt) {
     const out = run.out;
@@ -54,14 +58,17 @@ export function createRun({ lineup = LINEUP, rules } = {}) {
   }
 
   run.frame = (signals = {}) => {
+    const playing = Boolean(run.out?.playing) && !video.ended && !video.failed;
     const out = attention.update({
       ...baseSignals(run.t),
       ...signals,
       t: run.t,
-      video: { t: video.t, ended: video.ended, failed: video.failed },
+      video: { t: video.t, ended: video.ended, failed: video.failed, playing, ...signals.video },
     });
     if (!run.out || out.screen !== run.out.screen) {
-      video.t = 0; // a new video starts from the top
+      if (run.out?.screen === 'content') contentT = video.t;
+      if (out.screen === 'card') contentT = 0; // a new run
+      video.t = out.screen === 'content' ? contentT : 0; // a new ad starts from the top
       video.ended = false;
     }
     if (out.seek) {
@@ -85,7 +92,7 @@ export function createRun({ lineup = LINEUP, rules } = {}) {
     return run.out;
   };
 
-  // Shortcut: pinch on the card, then let the 1 s of content play out.
+  // Shortcut: pinch on the card, then let the content play out.
   run.toFirstAd = () => {
     run.frame({ selectStarted: true });
     while (run.out.screen !== 'ad1') run.frame();
