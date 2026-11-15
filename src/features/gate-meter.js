@@ -1,16 +1,14 @@
 import * as THREE from 'three';
 
 // WRAPZILLA gate meter (reference still 6): a volume bar beside the TV with a
-// dashed line to cross. `group` goes in the TV group, to the right of the screen.
-// Call update() every frame with the attention output's gate meter,
-// { visible, level, line }. It hides when there is no meter: any other ad, or
-// clap mode. The gate label isn't drawn here; the gate rule puts it in the
-// banner, which the banner feature draws.
+// dashed line to cross, drawn from output.gate { visible, level, line }.
+// It hides when there is no meter: any other ad, or clap mode. The gate label
+// isn't drawn here: the gate rule puts it in the banner, which banner-tint draws.
 
 const WIDTH = 0.15; // metres
 const HEIGHT = 0.9; // same as the TV screen
-// Centre, TV-local: about 8 cm right of the bezel. At 2.2 m that's about 24° off the
-// TV line, under look-away's 30°, so watching the meter doesn't pause the ad.
+// Centre, beside the TV: about 8 cm right of the bezel. At 2.2 m that's about
+// 24° off the TV line, under look-away's 30°, so watching the meter doesn't pause the ad.
 const X = 1.0;
 const PAD = 0.012; // fill inset from the card edge
 const RADIUS = 0.02;
@@ -41,10 +39,10 @@ function roundedRect(w, h, r) {
   return new THREE.ShapeGeometry(s);
 }
 
-export function createGateMeter() {
+export default function gateMeter({ world, tv }) {
   const group = new THREE.Group();
-  group.position.x = X;
   group.visible = false;
+  world.add(group);
 
   group.add(new THREE.Mesh(
     roundedRect(WIDTH, HEIGHT, RADIUS),
@@ -77,16 +75,17 @@ export function createGateMeter() {
 
   let shown = 0;
 
-  function update(meter) {
+  return (output) => {
+    const meter = output.gate;
     group.visible = Boolean(meter?.visible);
     if (!group.visible) {
       shown = 0;
       return;
     }
+    group.position.copy(tv.group.position); // follows calibration
+    group.position.x += X;
     shown = Math.max(meter.level ?? 0, shown * FALL);
     const top = meter.line / LINE_AT;
     fill.scale.y = Math.max(1e-4, Math.min(1, shown / top) * track);
-  }
-
-  return { group, update };
+  };
 }
