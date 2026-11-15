@@ -5,6 +5,10 @@ import { rlog } from '../remote-log.js';
 export default function sessionPost() {
   const debug = { sessionPost: 'waiting' };
   return (output) => {
+    // A restart (2 s hold in the finale) leaves the finale: the next run posts again.
+    if (!output.finale && (debug.sessionPost === 'posted' || debug.sessionPost === 'failed')) {
+      debug.sessionPost = 'waiting';
+    }
     if (debug.sessionPost === 'waiting' && output.finale) {
       debug.sessionPost = 'posting';
       const summary = { stats: output.stats, timestamp: new Date().toISOString(), usedJump: output.usedJump };
