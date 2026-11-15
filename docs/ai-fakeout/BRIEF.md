@@ -185,7 +185,7 @@ To make the real voice: get a 10 to 15 s sample of the speaker, run `seed_audio`
 
 For whoever has the Quest. It goes in a comment on this branch's PR once Bader allows the PR. The repo is public: the tunnel URL, real voice clips and real videos stay out of it.
 
-Open the page with `?fakeout` added to the address. Tap Start, then Enter VR. Start the video with "Pinch to play" (a video picked from the YouTube mirror has no sound, so it gets no voice).
+Open the page with `?fakeout` added to the address. Tap Start, then Enter VR. On the TV, pick a featured video: one with a file at `public/videos/<YouTube id>.mp4` and a voice at `public/voices/<YouTube id>.m4a` on the Mac that serves the page. Any other video on the mirror has no sound, so it gets no voice. Without the mirror the TV shows "Pinch to play", which has the stand-in voice.
 
 1. GLOOP starts after 1 s. Turn your head away from the TV and back, twice. The banner reads "Warning 1 of 3", then "Warning 2 of 3".
 2. Turn away a third time and stay away for 3 s. GLOOP ends and the video comes back with the banner "Fine. Enjoy your video."
