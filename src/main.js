@@ -6,6 +6,7 @@ import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
 import { createAttention } from './attention/index.js';
 import { FAKEOUT } from './fakeout.js';
+import { DOMAIN } from './domain.js';
 import { RULES } from './attention/rules/index.js';
 import { SENSORS } from './sensors/index.js';
 import { FEATURES } from './features/index.js';
@@ -159,8 +160,10 @@ startButton.addEventListener('click', async () => {
 const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
 // FAKEOUT adds a lineup, a rule and a feature only when the URL has ?fakeout.
-const updateFeatures = [...FEATURES, ...FAKEOUT.features].map((setup) => setup(ctx));
-const attention = createAttention(FAKEOUT.lineup, [...RULES, ...FAKEOUT.rules]);
+// DOMAIN adds a rule and a feature unless the URL has ?domain=0 or its media is missing.
+// Its feature is last: it hides the room.
+const updateFeatures = [...FEATURES, ...FAKEOUT.features, ...DOMAIN.features].map((setup) => setup(ctx));
+const attention = createAttention(FAKEOUT.lineup, [...RULES, ...FAKEOUT.rules, ...DOMAIN.rules]);
 
 // Latest `debug` values returned by sensors and features, merged into the status line.
 const moduleDebug = {};
