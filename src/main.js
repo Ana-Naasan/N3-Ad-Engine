@@ -66,9 +66,23 @@ function calibrate(pose) {
   rlog('calibrate', { eyeHeight: +p.y.toFixed(3), yawDeg: +THREE.MathUtils.radToDeg(world.rotation.y).toFixed(1) });
 }
 
+// --- Holding the run while nobody can see it ---
+// With the headset off or a system menu up (the session isn't 'visible'), or
+// after leaving VR mid-run, the TV video pauses and run time stops, so no ad
+// plays out unseen and re-entering continues where it left off. Before the
+// first Enter VR the flat page runs, for key-jump testing.
+const MAX_FRAME_SECONDS = 0.1; // a longer gap between frames (a stall) counts as this long
+let enteredVR = false;
+
 renderer.xr.addEventListener('sessionstart', () => {
   calibrated = false;
+  enteredVR = true;
   const session = renderer.xr.getSession();
+  // Frames may stop altogether while hidden, so pause here rather than wait for one.
+  session.addEventListener('visibilitychange', () => {
+    rlog('visibility', { state: session.visibilityState });
+    if (session.visibilityState !== 'visible') tv.currentVideo?.pause();
+  });
   rlog('session-start', {
     enabledFeatures: session.enabledFeatures ?? 'unknown',
     frameRate: session.frameRate ?? 'unknown',
@@ -183,17 +197,36 @@ let lastStatusLog = 0;
 let lastSnap = 0;
 let lastScreen = null;
 let peakMic = 0;
+let lastFrameTime = null;
+let runTime = 0; // seconds the run has been watchable: signals.t
+let wasHeld = false;
 const round = (x, places) => (typeof x === 'number' ? +x.toFixed(places) : x);
 
 renderer.setAnimationLoop((time, xrFrame) => {
   const inVR = Boolean(renderer.xr.isPresenting && xrFrame);
+  const frameSeconds = lastFrameTime === null ? 0 : (time - lastFrameTime) / 1000;
+  lastFrameTime = time;
+
+  const visibility = inVR ? (renderer.xr.getSession().visibilityState ?? 'visible') : null;
+  const hold = inVR ? visibility !== 'visible' : enteredVR;
+  if (hold !== wasHeld) {
+    wasHeld = hold;
+    rlog(hold ? 'run-held' : 'run-resumed', { visibility, at: +runTime.toFixed(2) });
+  }
+  if (hold) {
+    tv.currentVideo?.pause(); // the next watchable frame's tv.apply resumes it
+    renderer.render(scene, camera);
+    return;
+  }
+  runTime += THREE.MathUtils.clamp(frameSeconds, 0, MAX_FRAME_SECONDS);
+
   let pose = null;
   if (inVR) {
     pose = xrFrame.getViewerPose(renderer.xr.getReferenceSpace());
     if (pose && !calibrated) calibrate(pose);
   }
 
-  const signals = blankSignals(time / 1000, inVR);
+  const signals = blankSignals(runTime, inVR);
   const frame = { time, xrFrame, pose, inVR };
   for (const read of readSensors) collectDebug(read(signals, frame));
   if (signals.micLevel !== null) peakMic = Math.max(peakMic, signals.micLevel);
