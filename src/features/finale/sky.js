@@ -27,9 +27,10 @@ export function createSkyScreen() {
     },
 
     // t: 0 = hidden, 0..1 = growing from TV size behind `from` (the TV's start position), 1 = full size.
-    update(t, from = POSITION) {
+    update(t, from) {
       mesh.visible = t > 0;
       if (!mesh.visible) return;
+      from ??= POSITION;
       mesh.position.set(
         THREE.MathUtils.lerp(from.x, POSITION.x, t),
         THREE.MathUtils.lerp(from.y, POSITION.y, t),
