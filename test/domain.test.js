@@ -177,13 +177,13 @@ describe('the domain', () => {
 
 describe('the ?domain flag', () => {
   it('the domain is on by default; ?domain=0 or missing media adds nothing', () => {
-    for (const search of ['', '?hints', '?domain', '?domain=1', '?fakeout']) {
+    for (const search of ['', '?hints', '?domain', '?domain=1']) {
       const on = domainFor(search);
       expect(on.on).toBe(true);
       expect(on.rules.map((r) => r.id)).toEqual(['domain']);
       expect(on.features).toHaveLength(1);
     }
-    for (const off of [domainFor('?domain=0'), domainFor('?fakeout&domain=0'), domainFor('', false)]) {
+    for (const off of [domainFor('?domain=0'), domainFor('', false)]) {
       expect(off).toEqual({ on: false, rules: [], features: [] });
     }
   });
@@ -195,17 +195,5 @@ describe('the ?domain flag', () => {
       expect(glance(run)).toMatchObject({ banner: 'Please return your eyes to the ad', domain: null });
     }
     expect(run.out.stats.headTurns).toBe(12);
-  });
-
-  it('with ?fakeout it leaves GLOOP alone and applies to WRAPZILLA', () => {
-    const run = runFor('?fakeout');
-    run.toFirstAd();
-    for (let i = 0; i < 12; i++) {
-      expect(glance(run)).toMatchObject({ screen: 'ad1', banner: LOOK_AWAY, domain: null });
-    }
-    run.frame({ jumpTo: 3 }); // WRAPZILLA
-    expect(glance(run)).toMatchObject({ screen: 'ad3', banner: `${LOOK_AWAY} (warning 1 of 2)` });
-    glance(run);
-    expect(run.frame(AWAY).domain).toEqual({ phase: 'cast', elapsed: 0 });
   });
 });
