@@ -98,3 +98,32 @@ Three research files from it are in [research/](research/):
 - [meta-look-outside-unity.md](research/meta-look-outside-unity.md): where a Meta-style look and free assets come from. It says the Horizon kit license carries a Meta copyright. The license reads "Copyright 2024 Bela Bohlender", MIT.
 
 The rest stays in `~/.t3/projects/sih-2026`: the map at `.scratch/rigged-fight/map.md`, its tickets, and the Blade & Sorcery mod research.
+
+## What is built
+
+Written at 13:55 on 2026-11-15 by the session that built the base cut. Tickets #6 to #11 merged to `main` while it worked, so this branch now includes `main` at 9ef7a29.
+
+- `src/attention/lineup-fakeout.js` holds the fake-out lineup and its two lengths, 5 s and 6 s.
+- `src/fakeout.js` reads the `?fakeout` flag. `src/main.js` and `src/tv.js` changed by two lines each to use it.
+- `scripts/make-watch-the-ad.mjs` makes `public/videos/watchTheAd.mp4`. Run it again after `content.mp4` or either length changes.
+- `test/fakeout.test.js` has 12 tests.
+
+Choices made while building:
+
+- The TV loads `watchTheAd` only when the flag is on. The plan above adds the name for every run. With the flag off, the page now makes the same five video elements as `main` does.
+- The clip is 6 s. The voice says "Watch the ad." five times and stops at 5.2 s. The picture pushes in by 10% so it does not look like a hung player.
+- The voice is 10 dB quieter than `say` makes it. At full level its peaks were 32 dB above the placeholder tones. `VOICE_GAIN_DB` in the script sets this.
+
+Checked on this Mac:
+
+- `npm test` passes, 114 tests in 10 files. `npm run build` passes and copies the clip to `dist/videos`.
+- Changing either length by 1 s makes tests in `test/fakeout.test.js` fail.
+- The clip has the same format as `ad1.mp4`. Its first frame matches the content frame at 5 s, SSIM 0.996.
+
+Side effects of a fake-out run:
+
+- It reports 12 s of video time, where a normal run reports 1 s. The finale receipt shows it. The KPI board adds it to the same totals as normal runs, which lowers the board's ad-to-video ratio.
+- The debug panel and the log show `ad 0` during the two steps.
+- The content clip starts again from 0 when it seems to resume. It had played for 1 s before GLOOP.
+
+Not tested: the page in any browser, the fake-out on the headset, how loud the voice is in the headset, and whether the cut from the content to the clip looks clean there.

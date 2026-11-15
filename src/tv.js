@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { FAKEOUT } from './fakeout.js';
 
 // The TV: a 1.6 x 0.9 m screen in a thin bezel, showing the "Pinch to play"
 // card or one of several videos.
 
-const VIDEO_NAMES = ['content', 'ad1', 'ad2', 'ad3', 'ad4'];
+const VIDEO_NAMES = ['content', 'ad1', 'ad2', 'ad3', 'ad4', ...FAKEOUT.videoNames]; // + watchTheAd with ?fakeout
 const TV_DIM_BRIGHTNESS = 0.2; // screen brightness while the ad plays on the palms
 
 function makeVideo(name) {
