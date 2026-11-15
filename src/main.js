@@ -5,7 +5,7 @@ import { createTV } from './tv.js';
 import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
 import { createAttention } from './attention/index.js';
-import { LINEUP } from './attention/lineup.js';
+import { FAKEOUT } from './fakeout.js';
 import { RULES } from './attention/rules/index.js';
 import { SENSORS } from './sensors/index.js';
 import { FEATURES } from './features/index.js';
@@ -158,8 +158,9 @@ startButton.addEventListener('click', async () => {
 // ctx.tv exposes group (#10 shrinks it), screenMaterial and texture (#8's palm screens).
 const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
-const updateFeatures = FEATURES.map((setup) => setup(ctx));
-const attention = createAttention(LINEUP, RULES);
+// FAKEOUT adds a lineup, a rule and a feature only when the URL has ?fakeout.
+const updateFeatures = [...FEATURES, ...FAKEOUT.features].map((setup) => setup(ctx));
+const attention = createAttention(FAKEOUT.lineup, [...RULES, ...FAKEOUT.rules]);
 
 // Latest `debug` values returned by sensors and features, merged into the status line.
 const moduleDebug = {};
