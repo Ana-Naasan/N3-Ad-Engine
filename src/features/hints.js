@@ -16,7 +16,7 @@ export function hintFor(output) {
     case 'card': return 'Pinch your fingers to play';
     case 'ad1': return 'Try: look away · cover your eyes · hold a pinch 2 s to skip';
     case 'ad2': return SKIP_HINTS[output.skip?.state] ?? '';
-    case 'ad3': return 'Shout WRAPZILLA (or clap if the mic is off)';
+    case 'ad3': return 'Shout FLEX TAPE (or clap if the mic is off)';
     default: return '';
   }
 }
