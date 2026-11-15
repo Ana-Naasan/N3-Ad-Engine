@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Generates 10 s placeholder MP4s in public/videos/ (H.264 + AAC tone).
+# File numbers follow play order: ad1 GLOOP, ad2 GRIN+, ad3 WRAPZILLA, ad4 VOIDCOLA.
 # Our ffmpeg has no drawtext, so ImageMagick draws the title card and ffmpeg
 # adds a moving progress bar (handy for checking pause/rewind) and a tone.
 set -euo pipefail
@@ -26,7 +27,7 @@ make() { # name bg title subtitle tone_hz
 
 make content "#1d3557" "HACKATHON IN 6 HOURS" "How to Build a Hackathon Project in 6 Hours" 330
 make ad1 "#e76f51" "GLOOP" "It's goo. It's good. It's GLOOP." 440
-make ad2 "#2a9d8f" "WRAPZILLA" "Plastic wrap that fights back." 523
-make ad3 "#8338ec" "GRIN+" "Teeth whitening for your soul." 587
+make ad2 "#8338ec" "GRIN+" "Teeth whitening for your soul." 587
+make ad3 "#2a9d8f" "WRAPZILLA" "Plastic wrap that fights back." 523
 make ad4 "#222222" "VOIDCOLA" "Now with 0% of everything." 659
 rm -rf "$tmp"
