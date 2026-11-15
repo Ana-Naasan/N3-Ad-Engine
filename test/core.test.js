@@ -116,7 +116,7 @@ describe('the finale (VOIDCOLA)', () => {
 
   it('every ad\'s own banner comes from the lineup', () => {
     const banners = [1, 2, 3, 4].map((n) => {
-      const run = createRun();
+      const run = createRun({ rules: [] }); // the lineup alone: rules (the gate's label) rank above it
       run.frame({ jumpTo: n });
       return run.frame().banner;
     });
