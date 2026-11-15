@@ -134,7 +134,7 @@ describe('the domain', () => {
     run.run(8); // into the ad wall
     expect(run.out.domain.phase).toBe('ads');
     run.run(2, (elapsed) => ({ selectStarted: elapsed === 0, selectHeld: elapsed }));
-    expect(run.frame({ selectHeld: 2 })).toMatchObject({ screen: 'ad2', domain: null });
+    expect(run.frame({ selectHeld: 2 })).toMatchObject({ screen: 'content', domain: null });
     expect(run.frame().domain).toBe(null);
   });
 

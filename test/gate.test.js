@@ -27,7 +27,7 @@ describe('gate, mic working', () => {
     const run = atWrapzilla();
     run.run(1, micOn(0.149));
     expect(run.out.screen).toBe('ad3');
-    expect(run.frame(micOn(0.15)).screen).toBe('ad4');
+    expect(run.frame(micOn(0.15)).screen).toBe('content');
   });
 
   it('does not pass on silence, and silence never counts as unavailable', () => {
@@ -60,7 +60,7 @@ describe('gate, mic unavailable', () => {
     const run = atWrapzilla();
     run.run(3);
     expect(run.out.banner).toBe('Clap to continue');
-    expect(run.frame({ clap: true }).screen).toBe('ad4');
+    expect(run.frame({ clap: true }).screen).toBe('content');
   });
 
   it('hides the meter in clap mode', () => {

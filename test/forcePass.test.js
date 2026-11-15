@@ -11,7 +11,7 @@ describe('force-pass', () => {
     run.toFirstAd();
     run.run(2, holding); // held 0 … 2 − DT
     expect(run.out.screen).toBe('ad1');
-    expect(run.frame({ selectHeld: 2 }).screen).toBe('ad2');
+    expect(run.frame({ selectHeld: 2 }).screen).toBe('content');
   });
 
   it('a hold released before 2 s passes nothing', () => {
@@ -25,10 +25,10 @@ describe('force-pass', () => {
 
   it('a Play pinch held 3 s (or longer) does not pass GLOOP', () => {
     const run = createRun();
-    // Pinch on the card and keep holding: content for 1 s, then GLOOP.
-    run.run(3, holding);
-    expect(run.frame({ selectHeld: 3 }).screen).toBe('ad1');
-    run.run(5, (e) => ({ selectHeld: 3 + e }));
+    // Pinch on the card and keep holding: content for 8 s, then GLOOP.
+    run.run(10, holding);
+    expect(run.frame({ selectHeld: 10 }).screen).toBe('ad1');
+    run.run(5, (e) => ({ selectHeld: 10 + e }));
     expect(run.out.screen).toBe('ad1');
   });
 
@@ -36,7 +36,7 @@ describe('force-pass', () => {
     const run = createRun();
     run.toFirstAd();
     run.run(2, holding);
-    expect(run.frame({ selectHeld: 2 }).screen).toBe('ad2');
+    expect(run.frame({ selectHeld: 2 }).screen).toBe('content');
     run.run(10, (e) => ({ selectHeld: 2 + e }));
     expect(run.out.screen).toBe('ad2');
   });
@@ -56,7 +56,7 @@ describe('force-pass', () => {
     run.run(2, (e) => ({ selectHeld: 1.5 + e }));
     expect(run.out.screen).toBe('ad1');
     run.run(2, holding); // a new select once the palms are down still works
-    expect(run.frame({ selectHeld: 2 }).screen).toBe('ad2');
+    expect(run.frame({ selectHeld: 2 }).screen).toBe('content');
   });
 
   it('never passes the finale (a 2 s hold there restarts instead: see restart.test.js)', () => {
