@@ -9,8 +9,7 @@
 // Warnings carry over from one ad to the next.
 //
 // Look-aways are detected as in ./lookAway.js: the same angles, on the same
-// ads, and not while palms are up. createRule({ leave }) names ads it leaves
-// alone: no warnings and no domain there.
+// ads, and not while palms are up.
 import { LOOK_AWAY_START_DEG, LOOK_AWAY_END_DEG, LOOK_AWAY_BANNER } from './lookAway.js';
 
 export const id = 'domain';
@@ -23,15 +22,14 @@ export function warningBanner(n) {
   return `${LOOK_AWAY_BANNER} (${n >= WARNINGS ? 'final warning' : `warning ${n} of ${WARNINGS}`})`;
 }
 
-export function createRule({ leave = [] } = {}) {
+export function createRule() {
   let away = false; // looking away, as the look-away rule sees it
   let warningsUsed = 0;
   let domain = null; // { since, adIndex } while it runs
 
   return (signals, ad) => {
     const { t, headAngle } = signals;
-    const applies = ad.lookAway && !ad.lookAwayExemptInGimmick && !signals.palmsUp
-      && !leave.includes(ad.name);
+    const applies = ad.lookAway && !ad.lookAwayExemptInGimmick && !signals.palmsUp;
     let turned = false; // a look-away starts on this frame
     if (!applies) away = false;
     else if (!away && headAngle > LOOK_AWAY_START_DEG) away = turned = true;
