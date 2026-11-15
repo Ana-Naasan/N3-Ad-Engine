@@ -5,8 +5,9 @@ import { rlog } from './remote-log.js';
 // site, running in a Chrome on the dev machine, as a texture. Frames are
 // fetched one at a time while the mirror is wanted and drawn to a canvas;
 // clicks and scrolls go back as 0-1 screen coordinates.
-// `available` is false until a frame has arrived, and again when the server
-// stops answering (a production build has no mirror), so callers can fall back.
+// `available` is false until a frame of a loaded YouTube page has arrived, and
+// again when the server stops answering or reports the page broken (a
+// production build has no mirror), so callers can fall back to the card.
 
 const WIDTH = 1024; // VIEW in server/youtube-mirror.js
 const HEIGHT = 576;
@@ -29,12 +30,15 @@ export function createYoutubeMirror() {
   let frames = 0;
   let ready = Promise.resolve(); // settles when the last reset has reached the server
   let resets = 0;
+  let lastError = null; // logged once, not every retry
 
   async function fetchFrame() {
     const at = resets;
     const res = await fetch(`/api/youtube/frame?after=${after}`, { cache: 'no-store' });
     // Only the mirror route sends this header: a server without it answers with something else.
-    if (!res.ok || !res.headers.has('x-yt-seq')) throw new Error(`GET /api/youtube/frame: HTTP ${res.status}`);
+    if (!res.ok || !res.headers.has('x-yt-seq')) {
+      throw new Error(`GET /api/youtube/frame: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    }
     if (res.status === 200) {
       const bitmap = await createImageBitmap(await res.blob());
       ctx2d.drawImage(bitmap, 0, 0, WIDTH, HEIGHT);
@@ -57,7 +61,8 @@ export function createYoutubeMirror() {
         await ready;
         await fetchFrame();
       } catch (e) {
-        if (available) rlog('youtube-mirror', { available: false, error: e.message });
+        if (available || e.message !== lastError) rlog('youtube-mirror', { available: false, error: e.message });
+        lastError = e.message;
         available = false;
         playing = false;
         local = null;

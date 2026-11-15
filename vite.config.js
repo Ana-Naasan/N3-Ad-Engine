@@ -95,17 +95,21 @@ function questLog() {
       const youtube = createYoutubeMirror();
       server.httpServer?.on('close', () => youtube.stop()); // also on a config restart
       // Long-poll: the next frame after ?after=<seq> as a JPEG, or 204 if the screen
-      // didn't change. Headers say whether a video is playing and name a featured pick.
+      // didn't change or YouTube is still loading, or 503 if its page is broken. Headers say whether a video is playing and name a featured pick.
       server.middlewares.use('/api/youtube/frame', async (req, res, next) => {
         if (req.method !== 'GET') return next();
         const after = Number(new URL(req.url, 'http://localhost').searchParams.get('after')) || 0;
         try {
           const frame = await youtube.waitFrame(after, FRAME_WAIT_MS);
+          const { status } = youtube;
+          if (status === 'broken') throw new Error(`YouTube mirror: the page didn't load (${youtube.state.url || 'nothing yet'})`);
           res.setHeader('Cache-Control', 'no-store');
           res.setHeader('X-Yt-Playing', youtube.state.playing ? '1' : '0');
           res.setHeader('X-Yt-Local', youtube.state.local ?? '');
           res.setHeader('X-Yt-Seq', String(frame?.seq ?? after));
-          if (!frame) {
+          if (!frame || status !== 'ready') {
+            // Loading: no frame yet. Ask again after a probe rather than spin on loading frames.
+            if (frame) await new Promise((resolve) => setTimeout(resolve, 250));
             res.statusCode = 204;
             res.end();
             return;

@@ -23,19 +23,25 @@ export const VIEW = { width: 1024, height: 576 };
 const PROBE_MS = 250; // how often the page is asked what it is doing
 const IDLE_MS = 3000; // no frame request for this long: pause the remote video
 const START_TIMEOUT_MS = 15000;
+const LOAD_TIMEOUT_MS = 15000; // not ready this long: the page is broken (a cold load took 8.4 s)
 const MAX_WHEEL = 2000; // px per scroll event
 
-// What the page is doing: the video page it is on (`videoId`, or null) and
-// whether that page's player has started (`playing`).
+// What the page is doing: the video page it is on (`videoId`, or null),
+// whether that page's player has started (`playing`; YouTube's own ad before
+// the video doesn't count), and whether YouTube has drawn a page (`ready`).
+// Until it has, the screen is a near-black loading page, or an error, consent
+// or bot-check page the viewer can't pick from.
 const PROBE = `(() => {
   const shorts = location.pathname.match(/^\\/shorts\\/([^/?]+)/);
   const videoId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') : shorts ? shorts[1] : null;
   const playing = Boolean(videoId) && [...document.querySelectorAll('video')].some((v) => !v.paused && v.currentTime > 0.1);
-  return { url: location.href, videoId, playing };
+  const ad = Boolean(document.querySelector('.html5-video-player.ad-showing'));
+  const ready = Boolean(document.querySelector('ytd-page-manager > :not([hidden])'));
+  return { url: location.href, videoId, playing: playing && !ad, ready };
 })()`;
 const PAUSE = `document.querySelectorAll('video').forEach((v) => v.pause())`;
 const PLAY = `(document.querySelector('video.html5-main-video') ?? document.querySelector('video'))?.play()`;
-const IDLE_STATE = { url: '', videoId: null, playing: false, local: null };
+const IDLE_STATE = { url: '', videoId: null, playing: false, ready: false, local: null };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
@@ -89,6 +95,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
   let lastWanted = 0;
   let probeTimer = null;
   let probes = 0;
+  let loadingSince = Date.now(); // when the page stopped being ready, or null while it is
 
   function send(method, params = {}) {
     return new Promise((resolve, reject) => {
@@ -148,6 +155,8 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
   }
 
   async function launch() {
+    if (typeof WebSocket === 'undefined') throw new Error('YouTube mirror: needs Node 22 or newer (no global WebSocket)');
+    loadingSince = Date.now();
     fs.mkdirSync(profileDir, { recursive: true });
     const portFile = path.join(profileDir, 'DevToolsActivePort');
     port = await runningPort(portFile);
@@ -199,6 +208,8 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     const seen = await evaluate(PROBE);
     if (!seen || at !== epoch) return;
     state = { ...seen, local: localVideo(videosDir, seen.videoId) };
+    if (seen.ready) loadingSince = null;
+    else loadingSince ??= Date.now();
     if (!allowedUrl(seen.url)) await reset();
     else if (seen.playing && state.local) await evaluate(PAUSE); // the page plays its own file instead
     else if (seen.playing && Date.now() - lastWanted > IDLE_MS) {
@@ -217,6 +228,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     epoch++;
     state = IDLE_STATE;
     idlePaused = false;
+    loadingSince = Date.now();
     await send('Page.navigate', { url: START_URL });
   }
 
@@ -231,6 +243,14 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
   return {
     get state() {
       return state;
+    },
+
+    // 'ready': YouTube has drawn a page. 'loading': not yet. 'broken': an error
+    // page, or still not ready after LOAD_TIMEOUT_MS; the TV falls back to its card.
+    get status() {
+      if (state.ready) return 'ready';
+      if (state.url.startsWith('chrome-error:')) return 'broken';
+      return loadingSince !== null && Date.now() - loadingSince > LOAD_TIMEOUT_MS ? 'broken' : 'loading';
     },
 
     // The newest frame if it is newer than `after`, else the next one, else

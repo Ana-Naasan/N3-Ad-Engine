@@ -17,8 +17,13 @@ import { rlog } from '../remote-log.js';
 // On the pick it tells the TV what the content is: a featured video's own
 // file (public/videos/<YouTube id>.mp4, with sound) or the mirror itself.
 //
-// Shares ctx.picker = { mirror, showing, pointers } with the picker feature,
-// which sets `showing` and draws the pointers.
+// The mirror is one Chrome page shared by every client of the dev server, so
+// only an XR session drives it (`active`): a Mac tab that loads or restarts
+// would otherwise reset the headset's page, and a pick would start every
+// client's run. ?mirror lets the flat page drive it, for testing with the mouse.
+//
+// Shares ctx.picker = { mirror, active, showing, pointers } with the picker
+// feature, which sets `showing` and draws the pointers.
 
 const SCREEN_W = 1.6; // m, the screen in tv.js
 const SCREEN_H = 0.9;
@@ -35,6 +40,7 @@ const STICK_DEADZONE = 0.15;
 const STICK_SPEED = 1400; // remote px/s at full thumbstick tilt
 const HOVER_SEND_SECONDS = 0.08;
 const HOVER_MIN_MOVE = 0.004; // of the screen: smaller moves aren't sent
+const FLAT_MIRROR = new URLSearchParams(location.search).has('mirror');
 
 const a = new THREE.Vector3();
 const b = new THREE.Vector3();
@@ -57,7 +63,7 @@ export default function picker(ctx) {
   // Pointers 0 and 1 are the XR inputs, 2 is the mouse. `hit` is where the
   // pointer lands on the screen (0-1), `down` the press in progress.
   const pointers = [0, 1, 2].map(() => ({ hit: null, origin: new THREE.Vector3(), point: new THREE.Vector3(), down: null }));
-  const state = { mirror, showing: false, pointers };
+  const state = { mirror, active: false, showing: false, pointers };
   ctx.picker = state;
 
   let now = 0; // this frame's time and length, in seconds
@@ -146,6 +152,7 @@ export default function picker(ctx) {
   return (signals, { inVR, xrFrame }) => {
     dt = Math.max(0, signals.t - now);
     now = signals.t;
+    state.active = inVR || FLAT_MIRROR;
     controllers.forEach((controller, i) => {
       if (inVR && controller.visible) {
         track(pointers[i], controller.position, direction.set(0, 0, -1).applyQuaternion(controller.quaternion), SMOOTHING);
@@ -190,7 +197,7 @@ export default function picker(ctx) {
     }
 
     let pick = null;
-    if (mirror.available) {
+    if (state.active && mirror.available) {
       pick = state.showing && Boolean(mirror.local || mirror.playing);
       if (pick) {
         tv.pickContent(mirror.local);
