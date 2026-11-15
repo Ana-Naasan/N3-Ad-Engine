@@ -3,10 +3,11 @@
 //                            plays it on a loop (src/features/fakeout-voice.js).
 //   public/voices/<id>.json  { pauses: [[start, end], ...] }: the gaps in the
 //                            video's sound, where the voice may cut in.
-// For now the voice is the macOS `say` voice Daniel. It is a stand-in until the
-// speaker's cloned voice replaces it.
-// Needs macOS `say` and ffmpeg.
-// Run: node scripts/make-voice.mjs [id]     (id defaults to "content")
+// Run: node scripts/make-voice.mjs [id] [voice-file]     (id defaults to "content")
+//   voice-file  a recording of the speaker's cloned voice saying the line
+//               (MP3, WAV or any format ffmpeg reads). Without it the voice is
+//               the macOS `say` voice Daniel, a stand-in.
+// Needs ffmpeg, and macOS `say` for the stand-in.
 // Run it again after the video changes.
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,13 +22,18 @@ const PAUSE_MIN_SECONDS = 0.25;
 // The placeholder tones average about -40 dB, which would be too quiet.
 const VOICE_MEAN_DB = [-32, -16];
 
+const LOOP_GAP_SECONDS = 0.6; // silence added after a voice file, before it loops
+
 const id = process.argv[2] ?? 'content';
+const voiceFile = process.argv[3];
 const root = path.join(import.meta.dirname, '..');
 const video = path.join(root, 'public/videos', `${id}.mp4`);
 const voices = path.join(root, 'public/voices');
-if (!fs.existsSync(video)) {
-  console.error(`No video at ${video}`);
-  process.exit(1);
+for (const [what, file] of [['video', video], ['voice file', voiceFile]]) {
+  if (file && !fs.existsSync(file)) {
+    console.error(`No ${what} at ${file}`);
+    process.exit(1);
+  }
 }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'make-voice-'));
 process.on('exit', () => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -56,13 +62,18 @@ const round = (x) => Math.round(x * 100) / 100;
 const pauses = starts.map((start, i) => [round(start), round(ends[i] ?? seconds)]);
 
 // The voice, at the video's level.
-const aiff = path.join(tmp, 'voice.aiff');
-execFileSync('say', ['-v', 'Daniel', '-o', aiff, LINE]);
+let source = voiceFile;
+if (!source) {
+  source = path.join(tmp, 'voice.aiff');
+  execFileSync('say', ['-v', 'Daniel', '-o', source, LINE]);
+}
 const target = Math.min(Math.max(videoLevels.mean, VOICE_MEAN_DB[0]), VOICE_MEAN_DB[1]);
-const gain = target - levels(aiff).mean;
+const gain = target - levels(source).mean;
+const filters = [`volume=${gain.toFixed(1)}dB`];
+if (voiceFile) filters.push(`apad=pad_dur=${LOOP_GAP_SECONDS}`);
 const m4a = path.join(tmp, 'voice.m4a');
 execFileSync('ffmpeg', [
-  '-loglevel', 'error', '-y', '-i', aiff, '-af', `volume=${gain.toFixed(1)}dB`,
+  '-loglevel', 'error', '-y', '-i', source, '-vn', '-af', filters.join(','),
   '-c:a', 'aac', '-b:a', '96k', '-ar', '48000', '-ac', '1', m4a,
 ]);
 
@@ -70,6 +81,7 @@ fs.mkdirSync(voices, { recursive: true });
 fs.copyFileSync(m4a, path.join(voices, `${id}.m4a`));
 fs.writeFileSync(path.join(voices, `${id}.json`), `${JSON.stringify({ pauses })}\n`);
 console.log(
-  `made public/voices/${id}.m4a (${gain.toFixed(1)} dB, average ${target.toFixed(1)} dB) and `
+  `made public/voices/${id}.m4a from ${voiceFile ?? 'the stand-in voice'} `
+  + `(${gain.toFixed(1)} dB, average ${target.toFixed(1)} dB) and `
   + `${id}.json with ${pauses.length} pauses`,
 );
