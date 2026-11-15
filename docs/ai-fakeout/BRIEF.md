@@ -145,7 +145,7 @@ Files:
 - `src/attention/rules/fakeout.js`: the warnings, the give-up and the pass-through. `src/fakeout.js` adds it after `RULES`, so `rules/index.js` is untouched.
 - `src/features/fakeout-voice.js`: when the voice is on, and the audio. `src/fakeout.js` adds it after `FEATURES`.
 - `src/main.js`: three lines changed. No other existing file changed.
-- `scripts/make-voice.mjs`: makes `public/voices/<id>.m4a` and `<id>.json` (the gaps in the video's sound) from `public/videos/<id>.mp4`. The voice is the macOS voice Daniel for now.
+- `scripts/make-voice.mjs`: makes `public/voices/<id>.m4a` and `<id>.json` (the gaps in the video's sound) from `public/videos/<id>.mp4`. A second argument is a recording of the cloned voice. Without it the voice is the macOS voice Daniel, a stand-in.
 - `test/fakeout.test.js`: 28 tests.
 
 Checked on this Mac:
@@ -160,10 +160,23 @@ Side effects of a fake-out run:
 - The 10 s of resumed content count as video time and the returning GLOOP counts as ad time, on the receipt and on the KPI board.
 - The content starts again from 0 when it seems to resume.
 
-Not tested: the page in any browser, anything on the headset, the Quest Browser playing the separate audio element, and how the switch sounds.
+Checked in desktop Chrome at 14:25 (headless, sound muted, the camera turned by script to stand in for a head turn): three warnings, the give-up, the voice starting about 5 s after the video resumed with the content muted, the voice carrying on while a look-away paused the returning GLOOP, and the voice stopping when that GLOOP ended. No page errors.
+
+Not tested: anything on the headset, the Quest Browser playing the separate audio element, and how the switch sounds. Nobody has listened to it yet.
 
 Not decided:
 
 - Who speaks in the featured videos. The voice is cloned only from someone who agreed. Bader was asked at 14:02.
-- Which tool clones the voice. See [research/voice-cloning.md](research/voice-cloning.md) once it is written. An install or an API key needs Bader's yes.
+- Which video the TV plays, and a voice sample of its speaker. This is the only thing the cloned voice waits on.
 - A line written live from the viewer's numbers. It comes after the cloned voice works.
+
+## The voice tool: Higgsfield, set up at 14:45
+
+Bader chose Higgsfield and asked for the setup. On this Mac:
+
+- `@higgsfield/cli` 1.2.2 is installed globally (`higgsfield`, `higgs`, `hf`). Bader signed in. The workspace `Private` is selected: ultra plan, 10 credits at 14:45.
+- The nine `higgsfield-*` skills are in `~/.agents/skills`, linked for Claude Code and Codex. They are not in this repo.
+- The model `seed_audio` (Seed Audio 1.0) takes a prompt and `--audio-references`, a sample of a voice. `higgsfield generate cost seed_audio --prompt "<the line>"` reports 0.5 credits. No job has been created and nothing has been uploaded.
+- `higgsfield voices list` shows 114 preset voices and no cloned one. The CLI has no command that creates a saved cloned voice.
+
+To make the real voice: get a 10 to 15 s sample of the speaker, run `seed_audio` with it and the line, then `node scripts/make-voice.mjs <id> <the download>`. Other tools, should Higgsfield sound wrong: [research/voice-cloning.md](research/voice-cloning.md).
