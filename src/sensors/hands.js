@@ -13,7 +13,10 @@ import * as THREE from 'three';
 //   palmGapMin     smallest palm-to-palm distance in the last second (m)
 //   palmClosePeak  fastest closing speed in the last second (m/s)
 //   claps          claps detected so far
-export const PALMS_UP_DISTANCE = 0.15; // m, palm centre to head
+// m, palm centre to head. The head pose is inside the headset, so the visor keeps
+// the palms away: palms held over it measured 19 to 25 cm in the headset log,
+// and at 0.15 the ad never moved to the palms in any logged run.
+export const PALMS_UP_DISTANCE = 0.27;
 export const PALM_FACING_MIN = 0.3; // cosine: palm normal vs palm→head direction
 export const CLAP_DISTANCE = 0.08; // m, palm centre to palm centre
 export const CLAP_SPEED = 1; // m/s, palms closing
