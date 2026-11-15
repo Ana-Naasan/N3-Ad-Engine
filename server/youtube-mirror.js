@@ -5,7 +5,8 @@
 // Chrome starts on first use and keeps its profile in the gitignored logs folder.
 // Nothing is downloaded and YouTube's own ads are left alone.
 //
-// The mirror has no sound. A featured video, one with a prepared file at
+// The mirror's Chrome is muted: server/youtube-audio.js fetches the picked
+// video's sound for the page to play in step with `t`. A featured video, one with a prepared file at
 // public/videos/<YouTube id>.mp4, is reported as `local` so the page plays
 // that file through its own <video> instead.
 import { spawn } from 'node:child_process';
@@ -28,7 +29,8 @@ const MAX_WHEEL = 2000; // px per scroll event
 
 // What the page is doing: the video page it is on (`videoId`, or null),
 // whether that page's player has started (`playing`; YouTube's own ad before
-// the video doesn't count), and whether YouTube has drawn a page (`ready`).
+// the video doesn't count), whether YouTube has drawn a page (`ready`), and
+// the player's time in seconds (`t`, at `at` ms).
 // Until it has, the screen is a near-black loading page, or an error, consent
 // or bot-check page the viewer can't pick from.
 const PROBE = `(() => {
@@ -37,7 +39,8 @@ const PROBE = `(() => {
   const playing = Boolean(videoId) && [...document.querySelectorAll('video')].some((v) => !v.paused && v.currentTime > 0.1);
   const ad = Boolean(document.querySelector('.html5-video-player.ad-showing'));
   const ready = Boolean(document.querySelector('ytd-page-manager > :not([hidden])'));
-  return { url: location.href, videoId, playing: playing && !ad, ready };
+  const t = (document.querySelector('video.html5-main-video') ?? document.querySelector('video'))?.currentTime ?? 0;
+  return { url: location.href, videoId, playing: playing && !ad, ready, t };
 })()`;
 const PAUSE = `document.querySelectorAll('video').forEach((v) => v.pause())`;
 const PLAY = `(document.querySelector('video.html5-main-video') ?? document.querySelector('video'))?.play()`;
@@ -210,7 +213,7 @@ export function createYoutubeMirror({ profileDir = 'logs/youtube-profile', video
     const at = epoch;
     const seen = await evaluate(PROBE);
     if (!seen || at !== epoch) return;
-    state = { ...seen, local: localVideo(videosDir, seen.videoId) };
+    state = { ...seen, at: Date.now(), local: localVideo(videosDir, seen.videoId) };
     if (seen.ready) loadingSince = null;
     else loadingSince ??= Date.now();
     if (!allowedUrl(seen.url)) await reset();

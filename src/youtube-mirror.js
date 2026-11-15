@@ -32,6 +32,8 @@ export function createYoutubeMirror() {
   let available = false;
   let playing = false;
   let local = null;
+  let audio = null; // the picked video's id once the server has its sound
+  let time = { t: 0, at: 0 }; // the remote player's time, and when it was heard (performance.now())
   let frames = 0;
   let ready = Promise.resolve(); // settles when the last reset has reached the server
   let resets = 0;
@@ -40,6 +42,7 @@ export function createYoutubeMirror() {
   async function fetchFrame() {
     const at = resets;
     const res = await fetch(`/api/youtube/frame?after=${after}`, { cache: 'no-store' });
+    const heardAt = performance.now();
     // Only the mirror route sends this header: a server without it answers with something else.
     if (!res.ok || !res.headers.has('x-yt-seq')) {
       throw new Error(`GET /api/youtube/frame: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
@@ -57,6 +60,8 @@ export function createYoutubeMirror() {
     if (at !== resets || !wanted) return; // asked before a reset or a pause: its state is out of date
     playing = res.headers.get('x-yt-playing') === '1';
     local = res.headers.get('x-yt-local') || null;
+    audio = res.headers.get('x-yt-audio') || null;
+    time = { t: Number(res.headers.get('x-yt-time')) || 0, at: heardAt };
   }
 
   async function loop() {
@@ -71,6 +76,7 @@ export function createYoutubeMirror() {
         available = false;
         playing = false;
         local = null;
+        audio = null;
         await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
       }
     }
@@ -102,6 +108,16 @@ export function createYoutubeMirror() {
       return local;
     },
 
+    // The YouTube id whose sound /api/youtube/audio/<id>.m4a serves, or null (see server/youtube-audio.js).
+    get audio() {
+      return audio;
+    },
+
+    // The remote player's time now, in seconds: the last report, run on while it plays.
+    get time() {
+      return playing ? time.t + (performance.now() - time.at) / 1000 : time.t;
+    },
+
     get frames() {
       return frames;
     },
@@ -131,6 +147,7 @@ export function createYoutubeMirror() {
       resets++;
       playing = false;
       local = null;
+      audio = null;
       ready = send({ type: 'reset' });
     },
   };

@@ -30,8 +30,12 @@ pointer back as mouse events. Chrome must be installed on the dev machine.
   `?mirror` to the URL to drive it with the mouse on the flat page.
 - The first ad cuts in after 8 s of real playback of the picked video, and the video comes
   back for 5 s between ads. Loading and YouTube's own ad don't count as playback.
-- The mirror has no sound, and YouTube's own ad may play before the video.
-- A featured video plays from its own file with sound instead: put it at
+- The picked video plays with sound: the mirror's Chrome is muted, so the dev server fetches
+  the video's audio with `tools/yt-dlp_macos` (committed, see `tools/README.md`; elsewhere a
+  `yt-dlp` on the PATH) into `logs/youtube-audio/`, and the page plays it in step with the
+  picture. It starts a few seconds after the pick. Without yt-dlp the video plays silent and
+  the server log says why. YouTube's own ad may play before the video, without sound.
+- A featured video plays from its own file instead: put it at
   `public/videos/<YouTube id>.mp4`, where the id is the part after `v=` in its URL.
 - During each ad the YouTube video pauses, and it carries on from the same spot afterwards.
 - The TV opens on a search results page, because YouTube's home page is empty when signed
