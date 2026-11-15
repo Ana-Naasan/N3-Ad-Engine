@@ -1,5 +1,15 @@
-// Placeholder for #11: posts the frozen stats once at finale entry.
-// No-op until #11 fills it in. Keep the registration in index.js.
+import { postSession } from '../session-api.js';
+import { rlog } from '../remote-log.js';
+
+// Posts the run's frozen stats once, when the finale starts. The KPI board refetches after.
 export default function sessionPost() {
-  return () => {};
+  let posted = false;
+  return (output) => {
+    if (posted || !output.finale) return;
+    posted = true;
+    const summary = { stats: output.stats, timestamp: new Date().toISOString(), usedJump: output.usedJump };
+    postSession(summary)
+      .then(() => rlog('session-posted', summary))
+      .catch((e) => console.warn('Session post failed:', e.message));
+  };
 }

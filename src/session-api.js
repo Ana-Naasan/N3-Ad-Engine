@@ -1,5 +1,26 @@
 // Client side of the dev-server session routes in vite.config.js.
 
+const postedListeners = new Set();
+
+// Calls fn after each session post settles, so readers can refetch totals.
+export function onSessionPosted(fn) {
+  postedListeners.add(fn);
+}
+
+// Posts one session summary: { stats, timestamp, usedJump }. Throws if the server refuses it.
+export async function postSession(summary) {
+  try {
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(summary),
+    });
+    if (!res.ok) throw new Error(`POST /api/sessions: HTTP ${res.status} ${await res.text()}`);
+  } finally {
+    for (const fn of postedListeners) fn();
+  }
+}
+
 // Totals over logged sessions, key-jump runs left out:
 // { sessions, adTime, videoTime, ratio (ad / video, null when no video time), headTurns, chaseMetres }.
 // Throws when the server is unreachable or answers with something else.
