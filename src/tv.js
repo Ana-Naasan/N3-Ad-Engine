@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-// The TV: a 1.6 x 0.9 m screen in a thin bezel, showing one of several videos.
+// The TV: a 1.6 x 0.9 m screen in a thin bezel, showing the "Pinch to play"
+// card or one of several videos.
 
 const VIDEO_NAMES = ['content', 'ad1', 'ad2', 'ad3', 'ad4'];
 
@@ -15,6 +16,26 @@ function makeVideo(name) {
   return { video, texture };
 }
 
+function makeCardTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#14100c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#e9a03b';
+  ctx.font = '700 120px system-ui, sans-serif';
+  ctx.fillText('▶', 640, 290);
+  ctx.fillStyle = '#f4e9d8';
+  ctx.font = '700 96px system-ui, sans-serif';
+  ctx.fillText('Pinch to play', 640, 450);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 export function createTV() {
   const group = new THREE.Group();
 
@@ -25,12 +46,33 @@ export function createTV() {
   bezel.position.z = -0.025;
   group.add(bezel);
 
-  const screenMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const cardTexture = makeCardTexture();
+  const screenMaterial = new THREE.MeshBasicMaterial({ map: cardTexture });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), screenMaterial);
   group.add(screen);
 
   const videos = Object.fromEntries(VIDEO_NAMES.map((n) => [n, makeVideo(n)]));
-  let current = null;
+  let shown = 'card';
+  let current = null; // null while the card shows
+  let playFailed = false;
+
+  function switchTo(name) {
+    current?.video.pause();
+    shown = name;
+    playFailed = false;
+    current = videos[name] ?? null;
+    if (current) current.video.currentTime = 0; // every screen starts from the top
+    screenMaterial.map = current ? current.texture : cardTexture;
+    screenMaterial.needsUpdate = true;
+  }
+
+  function play(video) {
+    video.play().catch((e) => {
+      if (e.name === 'AbortError') return; // a pause or switch interrupted it
+      playFailed = true; // stop retrying; the attention module times the ad out
+      console.warn('video play failed', video.src, e.name, e.message);
+    });
+  }
 
   return {
     group,
@@ -44,18 +86,29 @@ export function createTV() {
       }
     },
 
-    show(name, { loop = false } = {}) {
-      if (current && current !== videos[name]) current.video.pause();
-      current = videos[name];
-      current.video.loop = loop;
-      screenMaterial.map = current.texture;
-      screenMaterial.color.set(0xffffff);
-      screenMaterial.needsUpdate = true;
-      return current.video.play();
+    // Apply one frame of attention output: { screen, playing, loop, seek }.
+    apply({ screen: name, playing, loop, seek }) {
+      if (name !== shown) switchTo(name);
+      if (!current) return;
+      const { video } = current;
+      video.loop = Boolean(loop);
+      if (seek) video.currentTime = Math.max(0, video.currentTime + seek);
+      // An ended, non-looping video stays ended: play() would restart it.
+      if (playing && video.paused && !video.ended && !playFailed) play(video);
+      else if (!playing && !video.paused) video.pause();
     },
 
     get currentVideo() {
       return current?.video ?? null;
+    },
+
+    get failed() {
+      return playFailed || Boolean(current?.video.error);
+    },
+
+    // What the screen shows now (video or card), for features like palm screens.
+    get texture() {
+      return screenMaterial.map;
     },
   };
 }

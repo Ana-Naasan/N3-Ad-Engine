@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { buildRoom } from './room.js';
 import { createTV } from './tv.js';
-import { createPanel } from './panels.js';
-import { startMic, getMicLevel, resumeMic, getMicDiagnostics } from './mic.js';
+import { startMic, resumeMic, getMicDiagnostics } from './mic.js';
 import { rlog, sendSnapshot } from './remote-log.js';
+import { createAttention } from './attention-stand-in.js'; // TODO(#4): real module + lineup
+import { SENSORS } from './sensors/index.js';
+import { FEATURES } from './features/index.js';
 
 rlog('load', { userAgent: navigator.userAgent, url: location.href });
 navigator.xr?.isSessionSupported('immersive-vr')
@@ -47,11 +49,6 @@ const tv = createTV();
 tv.group.position.set(0, DEFAULT_EYE_HEIGHT, -TV_DISTANCE);
 world.add(tv.group);
 
-const debugPanel = createPanel();
-debugPanel.mesh.position.set(1.3, DEFAULT_EYE_HEIGHT, -2.0);
-debugPanel.mesh.rotation.y = -0.45;
-world.add(debugPanel.mesh);
-
 // --- Calibration ---
 let calibrated = false;
 
@@ -62,7 +59,6 @@ function calibrate(pose) {
   world.position.set(p.x, 0, p.z);
   world.rotation.y = Math.atan2(-forward.x, -forward.z); // world -Z points where the head points
   tv.group.position.y = p.y;
-  debugPanel.mesh.position.y = p.y;
   world.updateMatrixWorld(true);
   calibrated = true;
   rlog('calibrate', { eyeHeight: +p.y.toFixed(3), yawDeg: +THREE.MathUtils.radToDeg(world.rotation.y).toFixed(1) });
@@ -95,9 +91,9 @@ const snapCanvas = document.createElement('canvas');
 snapCanvas.width = SNAP_W;
 snapCanvas.height = SNAP_H;
 
-function takeSnapshot() {
-  snapCamera.position.copy(headPos);
-  snapCamera.quaternion.copy(headQuat);
+function takeSnapshot({ headPos: p, headQuat: q }) {
+  snapCamera.position.set(p.x, p.y, p.z);
+  snapCamera.quaternion.set(q.x, q.y, q.z, q.w);
   snapCamera.updateMatrixWorld();
   const xrEnabled = renderer.xr.enabled;
   const previousTarget = renderer.getRenderTarget();
@@ -117,21 +113,8 @@ function takeSnapshot() {
   snapCanvas.toBlob((blob) => blob && sendSnapshot(blob), 'image/jpeg', 0.7);
 }
 
-// --- Head angle off the TV ---
-const headPos = new THREE.Vector3();
-const headQuat = new THREE.Quaternion();
-const tvPos = new THREE.Vector3();
-const toTV = new THREE.Vector3();
-const forward = new THREE.Vector3();
-
-function headAngleToTV() {
-  tv.group.getWorldPosition(tvPos);
-  toTV.subVectors(tvPos, headPos).normalize();
-  forward.set(0, 0, -1).applyQuaternion(headQuat);
-  return THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(forward.dot(toTV), -1, 1)));
-}
-
 // --- Start button: mic + video unlock happen here, before Enter VR ---
+// The content video no longer starts here: the "Pinch to play" card waits for a select.
 const startButton = document.getElementById('start');
 const status = document.getElementById('status');
 
@@ -139,9 +122,6 @@ startButton.addEventListener('click', async () => {
   startButton.disabled = true;
   rlog('start-click');
   tv.primeAll();
-  tv.show('content', { loop: true })
-    .then(() => rlog('content-playing'))
-    .catch((e) => console.warn('content play failed', e.name, e.message));
   let micMessage;
   try {
     await startMic();
@@ -154,35 +134,62 @@ startButton.addEventListener('click', async () => {
   document.body.appendChild(VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] }));
 });
 
-// --- Loop ---
-let frames = 0;
+// --- Frame pipeline: sensors -> attention -> features -> render ---
+const ctx = { renderer, scene, camera, world, tv };
+const readSensors = SENSORS.map((setup) => setup(ctx));
+const updateFeatures = FEATURES.map((setup) => setup(ctx));
+const attention = createAttention(); // TODO(#4): createAttention(lineup)
+
+// Every field #4's contract defines, with neutral values; sensors overwrite them.
+function blankSignals(t, inVR) {
+  return {
+    t,
+    inVR,
+    headAngle: 0,
+    headPos: { x: 0, y: 0, z: 0 },
+    headQuat: { x: 0, y: 0, z: 0, w: 1 },
+    palmsUp: false,
+    fingertips: [],
+    fingertipTravel: 0,
+    skipDistance: null,
+    skipTouched: false,
+    selectStarted: false,
+    selectHeld: 0,
+    micLevel: null,
+    micAvailable: false,
+    clap: false,
+    jumpTo: null,
+    video: { t: 0, ended: false, failed: false },
+  };
+}
+
 let fps = 0;
+let frames = 0;
 let fpsWindowStart = performance.now();
-let lastPanelUpdate = 0;
 let lastStatusLog = 0;
 let lastSnap = 0;
-let peakMic = 0;
+let lastScreen = null;
 
-renderer.setAnimationLoop((time, frame) => {
-  const inXR = renderer.xr.isPresenting && frame;
+renderer.setAnimationLoop((time, xrFrame) => {
+  const inVR = Boolean(renderer.xr.isPresenting && xrFrame);
   let pose = null;
-  if (inXR) {
-    pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+  if (inVR) {
+    pose = xrFrame.getViewerPose(renderer.xr.getReferenceSpace());
     if (pose && !calibrated) calibrate(pose);
   }
 
-  if (pose) {
-    const { position: p, orientation: q } = pose.transform;
-    headPos.set(p.x, p.y, p.z);
-    headQuat.set(q.x, q.y, q.z, q.w);
-  } else {
-    camera.getWorldPosition(headPos);
-    camera.getWorldQuaternion(headQuat);
-  }
-  const angle = headAngleToTV();
+  const signals = blankSignals(time / 1000, inVR);
+  const frame = { time, xrFrame, pose, inVR };
+  for (const read of readSensors) read(signals, frame);
 
-  const mic = getMicLevel();
-  if (mic !== null) peakMic = Math.max(peakMic, mic);
+  const output = attention.update(signals);
+
+  for (const update of updateFeatures) update(output, signals);
+
+  if (output.screen !== lastScreen) {
+    lastScreen = output.screen;
+    rlog('screen', { screen: output.screen, adIndex: output.adIndex, at: +signals.t.toFixed(2) });
+  }
 
   frames++;
   if (time - fpsWindowStart >= 1000) {
@@ -194,34 +201,26 @@ renderer.setAnimationLoop((time, frame) => {
   if (time - lastStatusLog >= 1000) {
     lastStatusLog = time;
     const video = tv.currentVideo;
+    const mic = signals.micLevel;
     rlog('status', {
-      angle: +angle.toFixed(1),
+      screen: output.screen,
+      adIndex: output.adIndex,
+      angle: +signals.headAngle.toFixed(1),
       mic: mic === null ? null : +mic.toFixed(3),
-      micPeak: +peakMic.toFixed(3),
+      micAvailable: signals.micAvailable,
       fps,
-      mode: inXR ? (calibrated ? 'vr-calibrated' : 'vr') : 'desktop',
-      headY: +headPos.y.toFixed(3),
+      mode: inVR ? (calibrated ? 'vr-calibrated' : 'vr') : 'desktop',
+      headY: +signals.headPos.y.toFixed(3),
+      selectHeld: +signals.selectHeld.toFixed(1),
+      fingertips: signals.fingertips.length,
       micState: getMicDiagnostics(),
       video: video ? { paused: video.paused, t: +video.currentTime.toFixed(1), muted: video.muted } : null,
     });
   }
 
-  if (snapEnabled && inXR && calibrated && time - lastSnap >= 5000) {
+  if (snapEnabled && inVR && calibrated && time - lastSnap >= 5000) {
     lastSnap = time;
-    takeSnapshot();
-  }
-
-  if (time - lastPanelUpdate > 100) {
-    lastPanelUpdate = time;
-    const video = tv.currentVideo;
-    const bar = mic === null ? '' : '#'.repeat(Math.min(20, Math.round(mic * 100)));
-    debugPanel.setLines([
-      `Head off TV: ${angle.toFixed(1)}°`,
-      `Mic: ${mic === null ? 'off' : mic.toFixed(3)} ${bar}`,
-      `Mic peak: ${peakMic.toFixed(3)}`,
-      `Video: ${video ? `${video.paused ? 'paused' : 'playing'} ${video.currentTime.toFixed(1)}s` : 'none'}`,
-      `FPS: ${fps}  ${inXR ? (calibrated ? 'VR (calibrated)' : 'VR') : 'desktop'}`,
-    ]);
+    takeSnapshot(signals);
   }
 
   renderer.render(scene, camera);
