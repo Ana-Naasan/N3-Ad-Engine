@@ -13,6 +13,10 @@ import {
 // /voices/<id>.json holds `pauses`, the [start, end] gaps in the video's
 // speech. Both come from scripts/make-voice.mjs. The id is tv.contentId when
 // the TV has a picker, and 'content' when it has none.
+//
+// A video can say the line itself, on camera: its json then has `lineAt`, the
+// second where the line starts. That video is not muted and the voice stays
+// off while it shows. The voice takes over when the ad comes back.
 
 export const NAG_MIN_SECONDS = 3; // the voice starts this long after the video
 export const NAG_MAX_SECONDS = 6; // resumes, at a random moment in this range,
@@ -27,7 +31,9 @@ export function createNag(random = Math.random) {
   let lastScreen = null;
   let startAt = 0;
 
-  return ({ screen, t, atPause = true }) => {
+  // `lineSpoken`: for a video that says the line itself, whether it has started
+  // to. It then decides the moment, in place of the random delay.
+  return ({ screen, t, atPause = true, lineSpoken }) => {
     if (screen !== lastScreen) {
       const resumed = screen === RESUME_SCREEN && lastScreen === RERUN_SCREEN;
       const adCameBack = screen === RERUN_SCREEN && lastScreen === RESUME_SCREEN;
@@ -40,9 +46,10 @@ export function createNag(random = Math.random) {
       }
       lastScreen = screen;
     }
-    if (phase === 'armed' && t >= startAt && (atPause || t >= startAt + PAUSE_WAIT_SECONDS)) {
-      phase = 'on';
-    }
+    const due = lineSpoken === undefined
+      ? t >= startAt && (atPause || t >= startAt + PAUSE_WAIT_SECONDS)
+      : lineSpoken;
+    if (phase === 'armed' && due) phase = 'on';
     return phase === 'on';
   };
 }
@@ -59,6 +66,7 @@ export default function fakeoutVoice({ tv }) {
   voice.preload = 'auto';
   let voiceId; // the content id whose voice is loaded, or null for none
   let pauses = [];
+  let lineAt = null; // the second where the video says the line itself, or null
   let on = false;
 
   function load() {
@@ -66,6 +74,7 @@ export default function fakeoutVoice({ tv }) {
     if (id === voiceId) return;
     voiceId = id;
     pauses = [];
+    lineAt = null;
     if (!id) {
       voice.removeAttribute('src');
       return;
@@ -73,7 +82,11 @@ export default function fakeoutVoice({ tv }) {
     voice.src = `/voices/${id}.m4a`;
     fetch(`/voices/${id}.json`)
       .then((r) => (r.ok ? r.json() : {}))
-      .then((info) => { if (voiceId === id) pauses = info.pauses ?? []; })
+      .then((info) => {
+        if (voiceId !== id) return;
+        pauses = info.pauses ?? [];
+        lineAt = info.lineAt ?? null;
+      })
       .catch(() => {});
   }
 
@@ -92,7 +105,12 @@ export default function fakeoutVoice({ tv }) {
 
     // A video with no voice file keeps its own sound: muting it would leave silence.
     const missing = Boolean(voiceId && voice.error);
-    const want = nag({ screen: output.screen, t: signals.t, atPause }) && Boolean(voiceId) && !missing;
+    const spoken = lineAt !== null;
+    const nagging = nag({
+      screen: output.screen, t: signals.t, atPause, lineSpoken: spoken ? now >= lineAt : undefined,
+    });
+    const onCamera = spoken && output.screen === RESUME_SCREEN; // the video is saying it
+    const want = nagging && Boolean(voiceId) && !missing && !onCamera;
     if (want !== on) {
       on = want;
       content.muted = on;

@@ -145,6 +145,17 @@ describe('after a dodged GLOOP', () => {
     expect(run.run(35).screen).toBe('ad2'); // GRIN+ loops until passed, as before
   });
 
+  it('a resumed video shorter than 10 s brings GLOOP back when its file ends', () => {
+    const run = fakeoutRun();
+    dodgeGloop(run);
+    run.run(6);
+    expect(run.out.screen).toBe('content');
+    run.video.ended = true; // the file is 6 s long
+    run.frame();
+    expect(run.frame().screen).toBe('ad1');
+    expect(run.video.t).toBeLessThanOrEqual(2 * DT); // GLOOP from the top
+  });
+
   it('a 2 s select hold on GLOOP is a dodge too', () => {
     const run = fakeoutRun();
     run.toFirstAd();
@@ -268,6 +279,22 @@ describe('the voice', () => {
     expect(track(nag, 5, 10, 'content', false)).toEqual([['on', 5 + 3 + 1.5]]);
   });
 
+  it('for a video that says the line itself, turns on when the line starts, whatever the delay', () => {
+    for (const lineT of [6.5, 10.5]) { // before the 3 s minimum, and after it
+      const nag = fresh(0);
+      track(nag, 0, 1, 'content');
+      track(nag, 1, 5, 'ad1');
+      const turnedOn = [];
+      let was = false;
+      for (let t = 6; t < 16; t += DT) {
+        const on = nag({ screen: 'content', t, lineSpoken: t >= lineT });
+        if (on && !was) turnedOn.push(t);
+        was = on;
+      }
+      expect(turnedOn).toEqual([lineT]);
+    }
+  });
+
   it('stays off for the first content, for the first GLOOP and for a GLOOP that was watched', () => {
     const nag = fresh(0);
     expect(track(nag, 0, 1, 'content')).toEqual([]);
@@ -304,7 +331,7 @@ describe('the voice feature', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   // The feature with a fake audio element, Start button and TV videos.
-  function setUp(tvExtra = {}) {
+  function setUp(tvExtra = {}, info = { pauses: [] }) {
     const voice = { calls: [] };
     vi.stubGlobal('Audio', class {
       constructor() { Object.assign(this, { loop: false, currentTime: 5 }); voice.el = this; }
@@ -316,7 +343,7 @@ describe('the voice feature', () => {
     vi.stubGlobal('document', {
       getElementById: (id) => ({ addEventListener: (type, fn) => { if (id === 'start' && type === 'click') click = fn; } }),
     });
-    vi.stubGlobal('fetch', () => Promise.resolve({ ok: true, json: () => Promise.resolve({ pauses: [] }) }));
+    vi.stubGlobal('fetch', () => Promise.resolve({ ok: true, json: () => Promise.resolve(info) }));
     const content = { muted: false, currentTime: 0 };
     const ad = { volume: 1 };
     const tv = { videos: { content: { video: content }, ad1: { video: ad } }, ...tvExtra };
@@ -389,6 +416,31 @@ describe('the voice feature', () => {
     expect(mirror.drive(8).debug.fakeoutVoice).toBe('off');
     expect(mirror.content.muted).toBe(false);
     expect(mirror.voice.calls).toEqual([]);
+  });
+
+  it('a video that says the line itself keeps its sound, and the voice starts when the ad is back', async () => {
+    const { voice, content, ad, run, drive, dodge } = setUp({}, { pauses: [], lineAt: 4 });
+    dodge();
+    await new Promise((resolve) => setTimeout(resolve)); // the json has loaded
+    content.currentTime = 3.9;
+    drive(8); // well past the 6 s latest start of the random delay
+    expect(run.out.screen).toBe('content');
+    expect(voice.calls).toEqual([]);
+
+    content.currentTime = 4; // the speaker starts the line, on camera
+    expect(drive(1).debug.fakeoutVoice).toBe('off');
+    expect(content.muted).toBe(false);
+    expect(voice.calls).toEqual([]);
+
+    drive(2); // the ad is back
+    expect(run.out.screen).toBe('ad1');
+    expect(voice.calls).toEqual(['play']);
+    expect(ad.volume).toBe(0.35);
+
+    drive(20); // watched to its end
+    expect(run.out.screen).toBe('ad2');
+    expect(voice.calls).toEqual(['play', 'pause']);
+    expect(ad.volume).toBe(1);
   });
 
   it('leaves the video\'s sound on when its voice file did not load', () => {

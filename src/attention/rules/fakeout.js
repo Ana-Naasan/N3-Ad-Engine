@@ -8,7 +8,8 @@
 //
 // The steps after it carry `fakeout`. They are for a viewer who dodged the ad:
 // it gave up, or a 2 s hold passed it. If the viewer watched the ad to its
-// end, this rule passes those steps at once.
+// end, this rule passes those steps at once. For a viewer who dodged, the
+// resumed video's step also ends when the video's file ends.
 //
 // Look-aways are detected as in ./lookAway.js: the same angles, and not while
 // palms are up.
@@ -34,7 +35,13 @@ export function createRule() {
       sawEnd = false;
     }
 
-    if (!ad.giveUpAfter) return ad.fakeout && !dodged ? { passed: true } : {};
+    if (!ad.giveUpAfter) {
+      if (!ad.fakeout) return {};
+      if (!dodged) return { passed: true };
+      // A resumed video shorter than its step: the ad comes back when the file ends.
+      const over = ad.fakeout === 'resume' && signals.video?.ended && signals.t > ad.startedAt;
+      return over ? { passed: true } : {};
+    }
 
     const { t, headAngle } = signals;
     // The first frame of a step can still carry the last video's `ended`.
