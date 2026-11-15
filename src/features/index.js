@@ -8,6 +8,7 @@
 //           into the 1 s status log line.
 // Features run in this order, once per frame, after the attention module.
 // One line per module.
+import picker from './picker.js';
 import tvScreen from './tv-screen.js';
 import bannerTint from './banner-tint.js';
 import skip from './skip.js';
@@ -21,6 +22,7 @@ import debugPanel from './debug-panel.js';
 import hints from './hints.js';
 
 export const FEATURES = [
+  picker, // YouTube on the TV, before the TV screen so a new run's content is reset first
   tvScreen,
   bannerTint, // #6
   skip, // #7

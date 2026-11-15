@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import { defineConfig } from 'vite';
 import { STAT_KEYS, parseSession, sessionTotals } from './server/session-totals.js';
+import { createYoutubeMirror, parseInput } from './server/youtube-mirror.js';
 
 const MAX_BODY = 2 * 1024 * 1024; // the tunnel is public: cap uploads
+const FRAME_WAIT_MS = 2000; // how long a YouTube frame request waits for the screen to change
 
 function readBody(req, res, done) {
   const chunks = [];
@@ -87,6 +89,47 @@ function questLog() {
         } catch (e) {
           sendJson(res, 500, { error: e.message });
         }
+      });
+
+      // --- YouTube on the TV: see server/youtube-mirror.js. Chrome starts on the first request. ---
+      const youtube = createYoutubeMirror();
+      server.httpServer?.on('close', () => youtube.stop()); // also on a config restart
+      // Long-poll: the next frame after ?after=<seq> as a JPEG, or 204 if the screen
+      // didn't change. Headers say whether a video is playing and name a featured pick.
+      server.middlewares.use('/api/youtube/frame', async (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        const after = Number(new URL(req.url, 'http://localhost').searchParams.get('after')) || 0;
+        try {
+          const frame = await youtube.waitFrame(after, FRAME_WAIT_MS);
+          res.setHeader('Cache-Control', 'no-store');
+          res.setHeader('X-Yt-Playing', youtube.state.playing ? '1' : '0');
+          res.setHeader('X-Yt-Local', youtube.state.local ?? '');
+          res.setHeader('X-Yt-Seq', String(frame?.seq ?? after));
+          if (!frame) {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+          res.setHeader('Content-Type', 'image/jpeg');
+          res.end(frame.jpeg);
+        } catch (e) {
+          sendJson(res, 503, { error: e.message });
+        }
+      });
+      // One pointer event: {type: 'move' | 'click', x, y}, {type: 'scroll', x, y, dy} or {type: 'reset'}.
+      server.middlewares.use('/api/youtube/input', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        readBody(req, res, (buf) => {
+          let event = null;
+          try {
+            event = parseInput(JSON.parse(buf));
+          } catch {}
+          if (!event) {
+            sendJson(res, 400, { error: 'expected {type: move|click|scroll|reset, x, y, dy}' });
+            return;
+          }
+          youtube.input(event).catch((e) => console.warn('YouTube mirror input failed:', e.message));
+        });
       });
     },
   };

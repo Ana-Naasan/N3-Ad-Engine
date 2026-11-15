@@ -13,6 +13,8 @@
 //   - `stats` {headTurns, chaseMetres} are amounts to add, until the finale
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
 // the finale.
+// signals.pick: null when the card is the "Pinch to play" card; with a video
+// picker on the TV, false until the viewer picks a video and true once they have.
 //
 // The `ad` a rule receives is the lineup entry plus `index` (position in the
 // lineup, -1 for the card), `adIndex` (1–4, 0 before the ads) and `startedAt`.
@@ -66,8 +68,11 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
 
     const before = step;
 
-    // Built-in steps: the card waits for a select; content plays for its seconds.
-    if (step.kind === 'card' && signals.selectStarted) goTo(0, t);
+    // Built-in steps: the card waits for the viewer to start their video; content
+    // plays for its seconds. With a picker on the TV (signals.pick is a boolean)
+    // selects are its clicks, so only a pick starts; otherwise any select does.
+    const started = signals.pick == null ? signals.selectStarted : signals.pick;
+    if (step.kind === 'card' && started) goTo(0, t);
     else if (step.kind === 'content' && t - step.startedAt >= step.seconds) goTo(step.index + 1, t);
 
     const results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
