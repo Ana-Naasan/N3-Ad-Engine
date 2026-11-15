@@ -1,6 +1,6 @@
 // TEMPORARY stand-in for #4's attention module, with the same contract:
-// createAttention(lineup).update(signals) -> output. Delete it once #4 lands
-// and import the real module in src/main.js instead.
+// createAttention(lineup, rules).update(signals) -> output. Delete it once #4
+// lands and import the real one from src/attention/index.js in src/main.js.
 // It only does the card, 1 s of content, the ad order, GLOOP ending,
 // the 2 s force-pass and key jumps. No gimmicks.
 
@@ -9,7 +9,8 @@ const FORCE_PASS_SECONDS = 2;
 const FAILED_AD_SECONDS = 10;
 const LOOPING = new Set(['ad2', 'ad3', 'ad4']); // gimmick ads and the finale
 
-export function createAttention() {
+// The stand-in ignores lineup and rules; they are here to match the real signature.
+export function createAttention(lineup, rules) {
   let screen = 'card';
   let screenStart = 0;
   let failedAt = null;
@@ -50,12 +51,12 @@ export function createAttention() {
         tvDim: false,
         tint: null,
         banner: null,
-        skip: { state: 'hidden', progress: 0, jump: false },
+        skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: number of jumps so far
         gate: { visible: false, level: 0, line: 0, label: '' },
         finale: screen === 'ad4',
         stats: { adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 },
         usedJump,
-        adIndex: screen.startsWith('ad') ? Number(screen[2]) : 0,
+        adIndex: screen.startsWith('ad') ? Number(screen[2]) : 0, // 0 for card and content
       };
     },
   };
