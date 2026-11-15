@@ -41,3 +41,12 @@ export function getMicDiagnostics() {
     label: track?.label ?? '',
   };
 }
+
+// False when there's no mic, the track has ended or is muted/disabled, or the
+// audio context isn't running.
+export function isMicAvailable() {
+  return Boolean(
+    analyser && audioCtx.state === 'running' &&
+    track && track.readyState === 'live' && !track.muted && track.enabled,
+  );
+}
