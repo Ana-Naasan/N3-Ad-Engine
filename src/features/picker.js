@@ -3,8 +3,8 @@ import * as THREE from 'three';
 // Draws the video picker (see src/sensors/picker.js). While the card shows,
 // the TV gets the YouTube mirror's texture, and each pointer gets a cursor on
 // the screen plus a ray from the hand. Frames keep coming while the card or a
-// mirror-picked content is on screen. Each time the card comes up (page load,
-// or a restart from the finale) the mirror goes back to its start page.
+// mirror-picked content is on screen. Each time the card comes up in VR (on
+// entering VR, or a restart from the finale) the mirror goes back to its start page.
 // Without a mirror the TV keeps its "Pinch to play" card.
 
 const AMBER = 0xe9a03b;
@@ -38,17 +38,18 @@ export default function pickerFeature({ scene, tv, picker }) {
   const rays = [makeRay(), makeRay()];
   scene.add(...rays);
   let wasOnCard = false;
+  let wasBrowsing = false;
 
   return (output) => {
     const onCard = output.screen === 'card';
-    if (onCard && !wasOnCard) {
-      mirror.reset();
-      tv.resetContent();
-    }
+    const { active } = picker; // only an XR session (or ?mirror) drives the shared mirror
+    if (onCard && !wasOnCard) tv.resetContent();
+    if (onCard && active && !wasBrowsing) mirror.reset(); // also on entering VR with the card up
     wasOnCard = onCard;
-    mirror.setWanted(onCard || (output.screen === 'content' && !tv.contentId));
-    if (onCard) tv.setLive(mirror.available ? mirror.texture : null);
-    picker.showing = onCard && mirror.available;
+    wasBrowsing = onCard && active;
+    mirror.setWanted(active && (onCard || (output.screen === 'content' && !tv.contentId)));
+    if (onCard) tv.setLive(active && mirror.available ? mirror.texture : null);
+    picker.showing = onCard && active && mirror.available;
 
     pointers.forEach((pointer, i) => {
       const { hit } = pointer;
