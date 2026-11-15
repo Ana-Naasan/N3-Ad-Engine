@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { defineConfig } from 'vite';
+import { STAT_KEYS, parseSession, sessionTotals } from './server/session-totals.js';
 
 const MAX_BODY = 2 * 1024 * 1024; // the tunnel is public: cap uploads
 
@@ -13,9 +14,29 @@ function readBody(req, res, done) {
   });
   req.on('end', () => {
     done(Buffer.concat(chunks));
+    if (res.writableEnded) return; // the handler already answered
     res.statusCode = 204;
     res.end();
   });
+}
+
+function sendJson(res, status, body) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(JSON.stringify(body));
+}
+
+// --- Session summaries for the KPI board (#11) ---
+const SESSIONS_FILE = 'logs/sessions.jsonl';
+
+function readSessionsFile() {
+  try {
+    return fs.readFileSync(SESSIONS_FILE, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') return '';
+    throw e;
+  }
 }
 
 // Dev-only endpoints the headset posts to (see src/remote-log.js).
@@ -40,6 +61,32 @@ function questLog() {
           fs.writeFileSync(file, buf);
           fs.copyFileSync(file, 'logs/snaps/latest.jpg');
         });
+      });
+      server.middlewares.use('/api/sessions', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        readBody(req, res, (buf) => {
+          let session = null;
+          try {
+            session = parseSession(JSON.parse(buf));
+          } catch {}
+          if (!session) {
+            sendJson(res, 400, { error: 'expected {stats: {' + STAT_KEYS.join(', ') + '}, timestamp, usedJump}' });
+            return;
+          }
+          try {
+            fs.appendFileSync(SESSIONS_FILE, JSON.stringify(session) + '\n');
+          } catch (e) {
+            sendJson(res, 500, { error: e.message });
+          }
+        });
+      });
+      server.middlewares.use('/api/totals', (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        try {
+          sendJson(res, 200, sessionTotals(readSessionsFile()));
+        } catch (e) {
+          sendJson(res, 500, { error: e.message });
+        }
       });
     },
   };
