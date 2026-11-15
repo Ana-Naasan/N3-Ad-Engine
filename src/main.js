@@ -144,8 +144,9 @@ startButton.addEventListener('click', async () => {
 // ctx.tv exposes group (#10 shrinks it), screenMaterial and texture (#8's palm screens).
 const ctx = { renderer, scene, camera, world, tv };
 const readSensors = SENSORS.map((setup) => setup(ctx));
-const updateFeatures = FEATURES.map((setup) => setup(ctx));
-const attention = createAttention(FAKEOUT.lineup, RULES); // LINEUP unless the URL has ?fakeout
+// FAKEOUT adds a lineup, a rule and a feature only when the URL has ?fakeout.
+const updateFeatures = [...FEATURES, ...FAKEOUT.features].map((setup) => setup(ctx));
+const attention = createAttention(FAKEOUT.lineup, [...RULES, ...FAKEOUT.rules]);
 
 // Latest `debug` values returned by sensors and features, merged into the status line.
 const moduleDebug = {};

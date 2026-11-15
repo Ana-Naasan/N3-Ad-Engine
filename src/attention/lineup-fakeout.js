@@ -1,31 +1,39 @@
-// The fake-out lineup: LINEUP with two steps added after GLOOP. Pure data.
-// Used only with ?fakeout in the URL (see ../fakeout.js). LINEUP is not changed.
+// The fake-out lineup: LINEUP with GLOOP able to give up, and two steps added
+// after it. Pure data. Used only with ?fakeout in the URL (see ../fakeout.js).
+// LINEUP is not changed.
 //
-// After the first ad the viewer's video seems to resume. A few seconds later
-// it freezes and a voice repeats "Watch the ad". Then GRIN+ starts as usual.
+//   GLOOP        `giveUpAfter`: the ad gives up after that many look-away
+//                warnings (see ./rules/fakeout.js)
+//   the content  the viewer's video seems to resume. A few seconds in, the
+//                speaker starts saying "Don't skip the ad" (the voice is a
+//                feature: ../features/fakeout-voice.js)
+//   GLOOP again  the ad comes back and has to be watched to its end. The
+//                voice carries on over it.
 //
-// Both steps are `kind: 'content'`, so the ad numbers, the jump keys and the
-// ad guards stay as they are. A content step plays for its `seconds`.
+// If the viewer watched GLOOP to its end the first time, the rule passes both
+// added steps at once and GRIN+ starts as in the original run.
+//
+// GLOOP again is a second `kind: 'ad'` entry, so with the flag the ads count
+// 1 to 5 and the jump keys 1 to 4 go to GLOOP, GLOOP again, GRIN+ and WRAPZILLA.
 import { LINEUP } from './lineup.js';
 
-export const FAKEOUT_CONTENT_SECONDS = 5; // the video "resumes" for this long
-// Length of public/videos/watchTheAd.mp4. scripts/make-watch-the-ad.mjs reads
-// both numbers: it freezes the content clip at FAKEOUT_CONTENT_SECONDS and
-// makes the clip this long. Run it again after changing either one.
-export const WATCH_THE_AD_SECONDS = 6;
+export const GIVE_UP_AFTER_TURNS = 3; // look-away warnings before GLOOP gives up
+export const RESUME_SECONDS = 10; // the video plays this long before GLOOP comes back
 
-const FAKEOUT_STEPS = [
-  {
-    kind: 'content', screen: 'content', seconds: FAKEOUT_CONTENT_SECONDS,
-    banner: 'Fine. Enjoy your video.',
-  },
-  { kind: 'content', screen: 'watchTheAd', seconds: WATCH_THE_AD_SECONDS },
-];
-
-const afterGloop = LINEUP.findIndex((s) => s.name === 'GLOOP') + 1;
+const at = LINEUP.findIndex((s) => s.name === 'GLOOP');
+const gloop = LINEUP[at];
 
 export const FAKEOUT_LINEUP = [
-  ...LINEUP.slice(0, afterGloop),
-  ...FAKEOUT_STEPS,
-  ...LINEUP.slice(afterGloop),
+  ...LINEUP.slice(0, at),
+  { ...gloop, giveUpAfter: GIVE_UP_AFTER_TURNS },
+  {
+    kind: 'content', screen: 'content', seconds: RESUME_SECONDS,
+    banner: 'Fine. Enjoy your video.', fakeout: 'resume',
+  },
+  { ...gloop, fakeout: 'rerun' },
+  ...LINEUP.slice(at + 1),
 ];
+
+// The screens of the two added steps, for the voice feature.
+export const RESUME_SCREEN = FAKEOUT_LINEUP.find((s) => s.fakeout === 'resume').screen;
+export const RERUN_SCREEN = FAKEOUT_LINEUP.find((s) => s.fakeout === 'rerun').screen;

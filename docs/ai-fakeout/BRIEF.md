@@ -99,31 +99,71 @@ Three research files from it are in [research/](research/):
 
 The rest stays in `~/.t3/projects/sih-2026`: the map at `.scratch/rigged-fight/map.md`, its tickets, and the Blade & Sorcery mod research.
 
+## New direction from Bader, 14:00 on 2026-11-15
+
+His words:
+
+- "let's first focus on the actual TV and the recording with the AI because that's our MVP. Everything else is going to be built in like the original repo."
+- "it should be streaming through YouTube, and if you click the YouTube video and you skip the ads later on, randomly within the video that you're watching, the user that's speaking just keeps saying, 'Watch the ads, watch the ad,' in his own voice. So it's not like a robotic voice."
+- "it would keep saying, 'Watch the ad, watch the ad, watch the ad,' until you actually watch the ads completely and you finish them. And the sound won't go away until the ads are done, even if the ad is in front of the TV."
+- "If you can do it in real time, then good. If not, then it's fine. We can pre-prepare them as a clip that just says, 'Don't skip the ad,' but it should be a seamless switch, like talking regularly to, 'Oh, don't skip the ad,' whatever. It shouldn't seem like a cutoff."
+- "communicate back and forth with this thread for context work together", about the thread "Watch YouTube Videos With Interruptions".
+
+This replaces the base cut's freeze-frame clip.
+
+## The split with the YouTube thread
+
+The thread "Watch YouTube Videos With Interruptions" works on branch `t3/youtube-tv-ad-interruptions`. It owns how the video gets on the TV and the picker. This branch owns the voice, the look-away give-up and the returning ad.
+
+The contract, as that thread wrote it:
+
+- The viewer browses real YouTube on the TV through a mirror of a headless Chrome on this Mac. The mirror has no sound.
+- A featured video is one where `public/videos/<id>.mp4` exists. `<id>` is the YouTube video id. When the viewer picks it, the TV plays the local file through the `content` video element, with sound.
+- `tv.contentId` is that id, or `null` for any other pick. The voice file for it is `public/voices/<id>.m4a`.
+- The local file has to be the original of a video Bader uploaded. Neither thread downloads from YouTube.
+
+On this branch alone `tv.contentId` does not exist, and the voice feature then uses `public/voices/content.m4a`.
+
 ## What is built
 
-Written at 13:55 on 2026-11-15 by the session that built the base cut. Tickets #6 to #11 merged to `main` while it worked, so this branch now includes `main` at 9ef7a29.
+Written at 14:15 on 2026-11-15. This branch includes `main` at b8573bd.
 
-- `src/attention/lineup-fakeout.js` holds the fake-out lineup and its two lengths, 5 s and 6 s.
-- `src/fakeout.js` reads the `?fakeout` flag. `src/main.js` and `src/tv.js` changed by two lines each to use it.
-- `scripts/make-watch-the-ad.mjs` makes `public/videos/watchTheAd.mp4`. Run it again after `content.mp4` or either length changes.
-- `test/fakeout.test.js` has 12 tests.
+With `?fakeout` in the URL:
 
-Choices made while building:
+1. On GLOOP every look-away is a warning. The banner shows "Warning 2 of 3" when the viewer looks back.
+2. On the third warning, 3 s of looking away makes GLOOP give up. A 2 s pinch hold on GLOOP counts as a dodge too.
+3. The content plays for 10 s with the banner "Fine. Enjoy your video."
+4. Between 3 and 6 s in, at a gap in the speech, the content's own sound is muted and a voice starts saying "Don't skip the ad". The picture does not cut.
+5. GLOOP comes back and has to be watched to its end. Looking away pauses and rewinds it. The voice carries on, also while the ad is paused.
+6. When GLOOP ends, the voice stops and GRIN+ starts as usual.
 
-- The TV loads `watchTheAd` only when the flag is on. The plan above adds the name for every run. With the flag off, the page now makes the same five video elements as `main` does.
-- The clip is 6 s. The voice says "Watch the ad." five times and stops at 5.2 s. The picture pushes in by 10% so it does not look like a hung player.
-- The voice is 10 dB quieter than `say` makes it. At full level its peaks were 32 dB above the placeholder tones. `VOICE_GAIN_DB` in the script sets this.
+A viewer who watches GLOOP to its end the first time goes to GRIN+ within three frames.
+
+Files:
+
+- `src/attention/lineup-fakeout.js`: the lineup.
+- `src/attention/rules/fakeout.js`: the warnings, the give-up and the pass-through. `src/fakeout.js` adds it after `RULES`, so `rules/index.js` is untouched.
+- `src/features/fakeout-voice.js`: when the voice is on, and the audio. `src/fakeout.js` adds it after `FEATURES`.
+- `src/main.js`: three lines changed. No other existing file changed.
+- `scripts/make-voice.mjs`: makes `public/voices/<id>.m4a` and `<id>.json` (the gaps in the video's sound) from `public/videos/<id>.mp4`. The voice is the macOS voice Daniel for now.
+- `test/fakeout.test.js`: 28 tests.
 
 Checked on this Mac:
 
-- `npm test` passes, 114 tests in 10 files. `npm run build` passes and copies the clip to `dist/videos`.
-- Changing either length by 1 s makes tests in `test/fakeout.test.js` fail.
-- The clip has the same format as `ad1.mp4`. Its first frame matches the content frame at 5 s, SSIM 0.996.
+- `npm test` passes, 134 tests in 11 files. `npm run build` passes.
+- Changing any of the six fake-out constants makes a test fail.
+- The voice feature runs in the tests against a fake audio element and fake TV videos.
 
 Side effects of a fake-out run:
 
-- It reports 12 s of video time, where a normal run reports 1 s. The finale receipt shows it. The KPI board adds it to the same totals as normal runs, which lowers the board's ad-to-video ratio.
-- The debug panel and the log show `ad 0` during the two steps.
-- The content clip starts again from 0 when it seems to resume. It had played for 1 s before GLOOP.
+- The ads count 1 to 5. Jump keys 1 to 4 go to GLOOP, GLOOP again, GRIN+ and WRAPZILLA, so no key reaches VOIDCOLA.
+- The 10 s of resumed content count as video time and the returning GLOOP counts as ad time, on the receipt and on the KPI board.
+- The content starts again from 0 when it seems to resume.
 
-Not tested: the page in any browser, the fake-out on the headset, how loud the voice is in the headset, and whether the cut from the content to the clip looks clean there.
+Not tested: the page in any browser, anything on the headset, the Quest Browser playing the separate audio element, and how the switch sounds.
+
+Not decided:
+
+- Who speaks in the featured videos. The voice is cloned only from someone who agreed. Bader was asked at 14:02.
+- Which tool clones the voice. See [research/voice-cloning.md](research/voice-cloning.md) once it is written. An install or an API key needs Bader's yes.
+- A line written live from the viewer's numbers. It comes after the cloned voice works.
