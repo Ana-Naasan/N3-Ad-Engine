@@ -22,23 +22,34 @@ function makeVideo(name) {
   return { video, texture };
 }
 
+// The "Pinch to play" card. setLabel redraws its bottom line (e.g. while
+// YouTube loads); the ▶ only shows with the default label.
 function makeCardTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 1280;
   canvas.height = 720;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#14100c';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#e9a03b';
-  ctx.font = '700 120px system-ui, sans-serif';
-  ctx.fillText('▶', 640, 290);
-  ctx.fillStyle = '#f4e9d8';
-  ctx.font = '700 96px system-ui, sans-serif';
-  ctx.fillText('Pinch to play', 640, 450);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  let label = null;
+  texture.setLabel = (text) => {
+    if (text === label) return;
+    label = text;
+    ctx.fillStyle = '#14100c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (text === 'Pinch to play') {
+      ctx.fillStyle = '#e9a03b';
+      ctx.font = '700 120px system-ui, sans-serif';
+      ctx.fillText('▶', 640, 290);
+    }
+    ctx.fillStyle = '#f4e9d8';
+    ctx.font = '700 96px system-ui, sans-serif';
+    ctx.fillText(text, 640, text === 'Pinch to play' ? 450 : 360);
+    texture.needsUpdate = true;
+  };
+  texture.setLabel('Pinch to play');
   return texture;
 }
 
@@ -117,6 +128,11 @@ export function createTV() {
       // An ended, non-looping video stays ended: play() would restart it.
       if (playing && video.paused && !video.ended && !playFailed) play(video);
       else if (!playing && !video.paused) video.pause();
+    },
+
+    // The card's text, e.g. 'Loading YouTube…' while the mirror comes up.
+    setCardLabel(text) {
+      cardTexture.setLabel(text);
     },
 
     // The mirror's texture stands in for the card (null: the "Pinch to play" card).

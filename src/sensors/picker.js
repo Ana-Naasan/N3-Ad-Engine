@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createYoutubeMirror } from '../youtube-mirror.js';
 import { rlog } from '../remote-log.js';
+import { cardPick } from '../mirror-wait.js';
 
 // The video picker: real YouTube on the TV (see src/youtube-mirror.js),
 // controlled the way the Quest's own browser is. While the card step shows the
@@ -72,6 +73,7 @@ export default function picker(ctx) {
   let scrollAt = { x: 0.5, y: 0.5 };
   let lastScrollSent = 0;
   let glide = 0; // remote px/s still to play out after a drag
+  let waitStart = null; // when the mirror was first wanted in VR without a frame yet
   let hovered = null; // the last hover position sent
   let lastHoverSent = 0;
 
@@ -196,15 +198,20 @@ export default function picker(ctx) {
       lastHoverSent = now;
     }
 
-    let pick = null;
-    if (state.active && mirror.available) {
-      pick = state.showing && Boolean(mirror.local || mirror.playing);
-      if (pick) {
-        tv.pickContent(mirror.local);
-        rlog('pick', { video: mirror.local, from: mirror.local ? 'file' : 'mirror' });
-      }
+    // While YouTube loads, the card ignores pinches (see src/mirror-wait.js).
+    if (!state.active || mirror.available) waitStart = null;
+    else if (waitStart === null) waitStart = now;
+    const waited = waitStart === null ? 0 : now - waitStart;
+    const picked = mirror.available && state.showing && Boolean(mirror.local || mirror.playing);
+    const pick = cardPick({ active: state.active, available: mirror.available, picked, waited });
+    if (pick) {
+      tv.pickContent(mirror.local);
+      rlog('pick', { video: mirror.local, from: mirror.local ? 'file' : 'mirror' });
     }
+    const loading = state.active && !mirror.available && pick === false;
+    tv.setCardLabel(loading ? 'Loading YouTube…' : 'Pinch to play');
     signals.pick = pick;
-    return { debug: { youtube: pick === null ? 'off' : state.showing ? 'browsing' : 'idle', youtubeFrames: mirror.frames } };
+    const youtube = loading ? 'loading' : pick === null ? 'off' : state.showing ? 'browsing' : 'idle';
+    return { debug: { youtube, youtubeFrames: mirror.frames } };
   };
 }
