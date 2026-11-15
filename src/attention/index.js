@@ -22,6 +22,10 @@ import { RULES } from './rules/index.js';
 const BANNER_PRIORITY = ['lookAway', 'skip', 'gate'];
 const CARD = { kind: 'card', screen: 'card' };
 
+// In the finale, a select started there and held this long restarts the run
+// (back to the card, fresh stats), so takes can follow each other in VR.
+export const RESTART_SECONDS = 2;
+
 export function createAttention(lineup = LINEUP, rules = RULES) {
   const ruleFns = rules.map((r) => ({ id: r.id, update: r.createRule() }));
   const ads = lineup.filter((s) => s.kind === 'ad');
@@ -29,13 +33,24 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
   let lastT = null;
   let usedJump = false;
   let frozen = false;
-  const stats = { adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 };
+  let restartArmed = false; // a select started during the finale
+  const freshStats = () => ({ adTime: 0, videoTime: 0, headTurns: 0, chaseMetres: 0, peakVolume: 0 });
+  let stats = freshStats();
 
   function goTo(index, t) {
     const entry = lineup[index];
     if (!entry) return;
     step = { ...entry, index, adIndex: ads.indexOf(entry) + 1, startedAt: t };
+    restartArmed = false;
     if (entry.finale) frozen = true;
+  }
+
+  function restart(t) {
+    step = { ...CARD, index: -1, adIndex: 0, startedAt: t };
+    stats = freshStats();
+    usedJump = false;
+    frozen = false;
+    restartArmed = false;
   }
 
   function update(signals) {
@@ -68,7 +83,9 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     const { jumpTo } = signals;
     const video = signals.video || {};
     if (step.finale) {
-      // The finale loops forever and never advances.
+      // The finale loops forever and never advances; a held select restarts.
+      if (signals.selectStarted) restartArmed = true;
+      if (restartArmed && signals.selectHeld >= RESTART_SECONDS) restart(t);
     } else if (Number.isInteger(jumpTo) && jumpTo >= 1 && jumpTo <= ads.length) {
       goTo(lineup.indexOf(ads[jumpTo - 1]), t);
       usedJump = true;
