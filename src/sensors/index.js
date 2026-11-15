@@ -18,6 +18,7 @@ import fingertips from './fingertips.js';
 import select from './select.js';
 import hands from './hands.js';
 import skipProximity from './skip-proximity.js';
+import picker from './picker.js';
 
 export const SENSORS = [
   head,
@@ -28,4 +29,5 @@ export const SENSORS = [
   select,
   hands, // #8
   skipProximity, // #7
+  picker, // YouTube on the TV; sets ctx.picker for its feature
 ];

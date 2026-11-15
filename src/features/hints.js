@@ -21,7 +21,10 @@ export function hintFor(output) {
   }
 }
 
-export default function hints({ world, tv }) {
+const PICKER_HINT = 'Point at a video and pinch to play it · hold the pinch and move to scroll';
+
+export default function hints(ctx) {
+  const { world, tv } = ctx;
   if (!new URLSearchParams(location.search).has('hints')) return () => {};
 
   const panel = createPanel({ width: 1.8, height: 0.1, fontPx: 48 });
@@ -30,7 +33,7 @@ export default function hints({ world, tv }) {
   let lastText = null;
 
   return (output) => {
-    const text = hintFor(output);
+    const text = output.screen === 'card' && ctx.picker?.showing ? PICKER_HINT : hintFor(output);
     if (text !== lastText) {
       lastText = text;
       panel.mesh.visible = Boolean(text);

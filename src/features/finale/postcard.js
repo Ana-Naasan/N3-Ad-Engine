@@ -14,20 +14,33 @@ const POSTCARD_POSITION = new THREE.Vector3(-0.45, CABINET_TOP + 0.01 + (BEZEL_H
 
 const ease = (x) => x * x * (3 - 2 * x);
 
-export function createPostcard(tvGroup, faceTexture) {
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: faceTexture }));
+// getFaceTexture() is read at finale entry: the content of this run.
+export function createPostcard(tvGroup, getFaceTexture) {
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial());
   face.position.z = 0.002; // just in front of the TV screen
   face.visible = false;
   tvGroup.add(face);
 
-  let start = null; // the TV's time and pose at finale entry (the finale never ends)
+  let start = null; // the TV's time and pose at finale entry
 
   return {
     // Call once per frame with the finale flag and the time in seconds.
     // Returns the eased shrink progress: 0 = full-size TV, 1 = postcard.
     update(active, time) {
-      if (!active) return 0;
-      if (!start) start = { time, position: tvGroup.position.clone(), scale: tvGroup.scale.clone() };
+      if (!active) {
+        if (start) { // a restart left the finale: the TV goes back to full size
+          tvGroup.position.copy(start.position);
+          tvGroup.scale.copy(start.scale);
+          face.visible = false;
+          start = null;
+        }
+        return 0;
+      }
+      if (!start) {
+        start = { time, position: tvGroup.position.clone(), scale: tvGroup.scale.clone() };
+        face.material.map = getFaceTexture();
+        face.material.needsUpdate = true;
+      }
       const shrink = ease(THREE.MathUtils.clamp((time - start.time) / SHRINK_SECONDS, 0, 1));
       tvGroup.position.lerpVectors(start.position, POSTCARD_POSITION, shrink);
       tvGroup.scale.copy(start.scale).multiplyScalar(THREE.MathUtils.lerp(1, POSTCARD_SCALE, shrink));
