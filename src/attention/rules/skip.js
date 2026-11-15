@@ -23,8 +23,8 @@ export const FLY_OUT_S = 1; // the feature animates the fly-out over this long
 export const JUMP_M = 0.2;
 export const CATCHABLE_AFTER_JUMPS = 6;
 export const TOUCH_M = 0.04;
-export const HOLD_STILL_M = 0.01;
-export const HOLD_STILL_DEG = 1;
+export const HOLD_STILL_M = 0.03; // a standing viewer sways 1 to 2 cm without meaning to
+export const HOLD_STILL_DEG = 5; // and a few degrees
 export const HOLD_S = 5;
 export const HOLD_BANNER = 'Hold perfectly still';
 

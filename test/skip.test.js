@@ -1,5 +1,5 @@
 // GRIN+ Skip: fly-out, chase, catch, hold-still and the pass.
-// Spec values (20 cm, 4 cm, 6 jumps, 1 cm, 1°, 5 s) are written out literally
+// Spec values (20 cm, 4 cm, 6 jumps, 3 cm, 5°, 5 s) are written out literally
 // so changing a constant makes a test fail.
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
@@ -160,41 +160,50 @@ describe('hold still', () => {
     expect(run.frame().skip).toEqual({ state: 'enabled', progress: 1, jump: 6 });
   });
 
-  it('restarts from the new pose when the head moves 1.5 cm', () => {
+  it('restarts from the new pose when the head moves 3.5 cm', () => {
     const run = toLocked();
     run.run(3);
-    const moved = { ...HEAD, x: 0.015 };
+    const moved = { ...HEAD, x: 0.035 };
     expect(run.frame({ headPos: moved }).skip.progress).toBe(0);
     run.run(5 - DT, { headPos: moved }); // still at the new pose
     expect(run.out.skip.state).toBe('locked');
     expect(run.frame({ headPos: moved }).skip.state).toBe('enabled');
   });
 
-  it('allows 0.5 cm of movement', () => {
+  it('allows 2.5 cm of movement', () => {
     const run = toLocked();
-    run.run(5, { headPos: { ...HEAD, y: HEAD.y + 0.005 } });
+    run.run(5, { headPos: { ...HEAD, y: HEAD.y + 0.025 } });
     expect(run.out.skip.state).toBe('enabled');
   });
 
-  it('restarts when the head turns 1.5°', () => {
+  it('restarts when the head turns 5.5°', () => {
     const run = toLocked();
     run.run(3);
-    expect(run.frame({ headQuat: yaw(1.5) }).skip.progress).toBe(0);
-    run.run(5 - DT, { headQuat: yaw(1.5) });
+    expect(run.frame({ headQuat: yaw(5.5) }).skip.progress).toBe(0);
+    run.run(5 - DT, { headQuat: yaw(5.5) });
     expect(run.out.skip.state).toBe('locked');
-    expect(run.frame({ headQuat: yaw(1.5) }).skip.state).toBe('enabled');
+    expect(run.frame({ headQuat: yaw(5.5) }).skip.state).toBe('enabled');
   });
 
-  it('allows a 0.5° turn', () => {
+  it('allows a 4.5° turn', () => {
     const run = toLocked();
-    run.run(5, { headQuat: yaw(0.5) });
+    run.run(5, { headQuat: yaw(4.5) });
+    expect(run.out.skip.state).toBe('enabled');
+  });
+
+  it('allows the sway of a person standing still: 2 cm and 3° back and forth', () => {
+    const run = toLocked();
+    run.run(5, (elapsed) => {
+      const s = Math.sin(elapsed * 2 * Math.PI); // one sway a second
+      return { headPos: { ...HEAD, x: 0.02 * s }, headQuat: yaw(3 * s) };
+    });
     expect(run.out.skip.state).toBe('enabled');
   });
 
   it('measures from where the hold started, so slow drift still restarts it', () => {
     const run = toLocked();
-    // 0.6 mm per frame: never more than 1 cm in a frame, 1.2 cm after 20 frames.
-    run.run(3, (elapsed) => ({ headPos: { ...HEAD, x: (elapsed / DT) * 0.0006 } }));
+    // 1.5 mm per frame: never more than 3 cm in a frame, 3.15 cm after 21 frames.
+    run.run(3, (elapsed) => ({ headPos: { ...HEAD, x: (elapsed / DT) * 0.0015 } }));
     expect(run.out.skip.progress).toBeLessThan(0.5);
   });
 });
