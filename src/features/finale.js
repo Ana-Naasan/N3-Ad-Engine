@@ -9,7 +9,7 @@ import { createTimeLimit } from './finale/time-limit.js';
 // the lineup and is drawn by the banner feature. Runs after the TV screen
 // feature, so tv.texture is already the finale ad on the entry frame.
 // The sky screen and receipt live in `world`, which calibration moves.
-// POPUP_AFTER_SECONDS in (output.popup), the TV grows back and the purple
+// Once the viewer goes back to the video (output.popup), the TV grows back and the purple
 // "Screen Time Limit Reached" pop-up slams over the video (finale/time-limit.js).
 export default function finale({ world, tv }) {
   const postcard = createPostcard(tv.group, () => tv.contentTexture);

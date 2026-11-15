@@ -11,7 +11,8 @@ const SKIP_HINTS = {
 };
 
 export function hintFor(output) {
-  if (output.finale) return 'Look around · hold a pinch 2 s to restart';
+  if (output.popup) return 'Hold a pinch or the trigger 2 s to restart';
+  if (output.finale) return 'Look around · pinch or pull the trigger to go back to your video';
   switch (output.screen) {
     case 'card': return 'Pinch your fingers to play';
     case 'ad1': return 'Try: look away · cover your eyes · hold a pinch 2 s to skip';
