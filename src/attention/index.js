@@ -6,11 +6,14 @@
 // ./rules) get the signals and the current step, and their results are merged
 // here by fixed rules, never by registration order:
 //   - any `playing: false` pauses; seeks add up, clamped so video time >= 0
-//   - banner: lookAway > skip (hold-still) > gate > any other rule > the ad's own
+//   - banner: domain > lookAway > skip (hold-still) > gate > any other rule > the ad's own
 //   - target 'palms', tvDim and tint 'red' apply if any rule sets them
 //   - only the rule with id 'skip' sets `skip`; `gate` comes from any rule
 //   - any `passed` advances to the next step (never out of the finale)
 //   - `stats` {headTurns, chaseMetres} are amounts to add, until the finale
+//   - a rule that sets `domain` ({ phase, elapsed }, see ./rules/domain.js) owns
+//     the frame: every other rule's result but force-pass's is dropped, stats
+//     included. The output carries it; `domain` is null otherwise.
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
 // the finale.
 // signals.pick: null when the card is the "Pinch to play" card; with a video
@@ -21,7 +24,7 @@
 import { LINEUP, FAILED_AD_SECONDS } from './lineup.js';
 import { RULES } from './rules/index.js';
 
-const BANNER_PRIORITY = ['lookAway', 'skip', 'gate'];
+const BANNER_PRIORITY = ['domain', 'lookAway', 'skip', 'gate'];
 const CARD = { kind: 'card', screen: 'card' };
 
 // In the finale, a select started there and held this long restarts the run
@@ -75,7 +78,10 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
     if (step.kind === 'card' && started) goTo(0, t);
     else if (step.kind === 'content' && t - step.startedAt >= step.seconds) goTo(step.index + 1, t);
 
-    const results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
+    let results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
+    if (results.some(({ r }) => r.domain)) {
+      results = results.filter(({ id, r }) => r.domain || id === 'forcePass');
+    }
 
     if (!frozen) {
       for (const { r } of results) {
@@ -113,6 +119,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: a jump count
       gate: { visible: false, level: 0, line: null, label: null },
       finale: Boolean(step.finale),
+      domain: null,
       stats: { ...stats },
       usedJump,
       adIndex: step.adIndex,
@@ -129,6 +136,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       if (r.tvDim) out.tvDim = true;
       if (r.tint === 'red') out.tint = 'red';
       if (r.gate) out.gate = { ...out.gate, ...r.gate };
+      if (r.domain) out.domain = r.domain;
       if (id === 'skip' && r.skip) out.skip = { ...out.skip, ...r.skip };
     }
     out.seek = Math.max(seek, -(video.t ?? 0)) || 0;

@@ -3,9 +3,14 @@
 // values (30°, 25°, 3 s) are written out literally so changing a constant
 // makes a test fail.
 import { describe, it, expect } from 'vitest';
-import { createRun, DT } from './helpers/frames.js';
+import { createRun as createRunWith, DT } from './helpers/frames.js';
+import { RULES } from '../src/attention/rules/index.js';
+import { domainFor } from '../src/domain.js';
 
-const BANNER = 'Please return your eyes to the ad';
+// The run as main.js builds it: RULES, then the domain rule, which puts the warning count in the banner.
+const createRun = () => createRunWith({ rules: [...RULES, ...domainFor('').rules] });
+
+const BANNER = 'Please return your eyes to the ad (warning 1 of 3)'; // each run's first look-away
 const LOOKING_AWAY = { playing: false, tint: 'red', banner: BANNER };
 
 describe('looking away', () => {
