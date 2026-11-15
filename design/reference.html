@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unskippable VR – visual reference</title>
+<style>
+  :root {
+    --panel: rgba(20, 14, 10, 0.82); --cream: #f4e9d8; --amber: #e9a03b;
+    --wall: #d9b48a; --floor: #7a5233; --red: #c0262d;
+  }
+  body { margin: 0; padding: 24px 16px 48px; background: #1a1410; color: var(--cream); font: 15px/1.45 system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  p.lede { margin: 0 0 20px; opacity: .8; max-width: 70ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  figure { margin: 0; }
+  figcaption { margin-top: 8px; font-size: 14px; opacity: .85; }
+  figcaption b { color: var(--amber); }
+
+  /* A still: a 16:9 view of the room from the couch */
+  .still { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 10px;
+    background: radial-gradient(circle at 82% 30%, #ffe2a8 0, transparent 35%),
+                linear-gradient(#e8c49a, var(--wall) 68%, var(--floor) 68%); font-weight: 600; }
+  .still.baseline { background: url(room-baseline.jpg) center / cover; }
+  .rug { position: absolute; left: 22%; right: 22%; bottom: 0; height: 14%; background: #9b2d30; }
+  .tv { position: absolute; left: 50%; top: 42%; width: 46%; aspect-ratio: 16 / 9; transform: translate(-50%, -50%);
+    border: 5px solid #111; display: grid; place-items: center; text-align: center; color: #fff; font-size: 26px; letter-spacing: .5px; }
+  .tv small { display: block; font-size: 11px; font-weight: 400; }
+  .gloop { background: #e76f51; } .wrap { background: #2a9d8f; } .grin { background: #8338ec; } .void { background: #222; }
+  .panel { position: absolute; background: var(--panel); color: var(--cream); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+  .banner { left: 50%; transform: translateX(-50%); bottom: 9%; font-size: 17px; padding: 10px 18px; white-space: nowrap; }
+  .dim { position: absolute; inset: 0; background: rgba(150, 0, 10, .45); }
+  .skip { position: absolute; background: var(--amber); color: #1a1410; border-radius: 999px; padding: 6px 16px; font-size: 14px; }
+  .skip.locked { background: #6b5a45; color: var(--cream); }
+  .hand { position: absolute; font-size: 34px; }
+  .ring { position: absolute; width: 44px; height: 44px; border-radius: 50%;
+    background: conic-gradient(var(--amber) 0 62%, rgba(255,255,255,.15) 62% 100%); display: grid; place-items: center; }
+  .ring::after { content: "3.1s"; width: 34px; height: 34px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; font-size: 10px; }
+  .meter { position: absolute; right: 7%; top: 22%; width: 26px; height: 50%; background: var(--panel); border-radius: 6px; overflow: hidden; }
+  .meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; background: linear-gradient(#e9a03b, #2a9d8f); }
+  .meter .line { position: absolute; left: -4px; right: -4px; bottom: 75%; border-top: 3px dashed #fff; }
+  .palm { position: absolute; width: 23%; aspect-ratio: 3 / 4; border-radius: 40% 40% 30% 30%; background: #e76f51;
+    display: grid; place-items: center; color: #fff; font-size: 16px; box-shadow: 0 0 0 6px #c99a7a inset; }
+  .sky { position: absolute; left: 0; right: 0; top: 0; height: 44%; background: var(--void, #222); display: grid; place-items: center;
+    color: #fff; font-size: 44px; letter-spacing: 3px; }
+  .sky small { display: block; font-size: 13px; letter-spacing: 0; text-align: center; font-weight: 400; }
+  .postcard { position: absolute; left: 38%; top: 64%; width: 12%; aspect-ratio: 16 / 9; transform: translate(-50%, -50%);
+    background: #1d3557; border: 3px solid #111; font-size: 7px; color: #fff; display: grid; place-items: center; text-align: center; }
+  .receipt { position: absolute; right: 4%; top: 46%; width: 30%; background: #fbf8f1; color: #222; padding: 10px 12px;
+    font: 11px/1.5 ui-monospace, Menlo, monospace; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  .receipt hr { border: 0; border-top: 1px dashed #999; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 8px; }
+  .kpi { right: 2%; top: 22%; width: 27%; font-size: 10px; }
+  .kpi h4 { margin: 0 0 6px; font-size: 12px; color: var(--amber); }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .tile { background: rgba(255,255,255,.07); border-radius: 5px; padding: 4px 6px; }
+  .tile b { display: block; font-size: 15px; }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>Unskippable VR – visual reference</h1>
+<p class="lede">Target look for each moment, seen from the couch. The room, TV and panel style match the real
+headset render (still 1). Panels use the existing style: dark translucent card, cream text. Brand accent is amber.
+All brands are made up.</p>
+
+<div class="grid">
+  <figure>
+    <div class="still baseline"></div>
+    <figcaption><b>1 · Baseline (real headset screenshot, M1).</b> Room, TV and the panel style everything else reuses.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv gloop"><div>GLOOP<small>It's goo. It's good.</small></div></div>
+      <div class="dim"></div>
+      <div class="panel banner">Please return your eyes to the ad</div>
+    </div>
+    <figcaption><b>2 · Look away (&gt;30°).</b> Ad pauses, the room dims red, banner under the TV. Every 3 s away rewinds the ad 3 s.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv" style="background:#3a2a1e;font-size:13px;opacity:.6">(TV)</div>
+      <div class="palm" style="left:22%;top:18%">GLOOP</div>
+      <div class="palm" style="right:22%;top:18%">goo.</div>
+    </div>
+    <figcaption><b>3 · Palms over eyes.</b> The ad keeps playing, mapped onto your palms.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv grin"><div>GRIN+<small>Teeth whitening for your soul.</small></div></div>
+      <div class="skip" style="right:12%;top:20%">Skip ▸</div>
+      <div class="hand" style="right:30%;top:44%">✋</div>
+    </div>
+    <figcaption><b>4 · Skip chase.</b> Skip sits by the TV and jumps away when a fingertip gets within 20 cm.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv grin"><div>GRIN+<small>Teeth whitening for your soul.</small></div></div>
+      <div class="skip locked" style="left:61%;top:72%">Skip available in 5 seconds</div>
+      <div class="ring" style="left:47%;top:73%"></div>
+      <div class="panel banner" style="bottom:4%">Hold perfectly still</div>
+    </div>
+    <figcaption><b>5 · Caught → hold still.</b> A ring fills over 5 s; moving 1 cm or turning 1° resets it. Then Skip turns amber and works.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv wrap"><div>WRAPZILLA<small>Plastic wrap that fights back.</small></div></div>
+      <div class="meter"><div class="fill"></div><div class="line"></div></div>
+      <div class="panel banner">Say WRAPZILLA to continue</div>
+    </div>
+    <figcaption><b>6 · Say WRAPZILLA.</b> Volume meter beside the TV; cross the dashed line to pass. Fallback if the mic is dead in VR: “Clap to continue”, same layout without the meter.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still" style="--void:#222"><div class="sky"><div>VOIDCOLA<small>Now with 0% of everything.</small></div></div>
+      <div class="postcard">HACKATHON<br>IN 6 HOURS</div>
+      <div class="panel banner" style="bottom:5%;left:36%">Your video will resume after 2 more ads</div>
+      <div class="receipt">
+        <div style="text-align:center">*** YOUR RECEIPT ***</div><hr>
+        <div class="row"><span>Time on ads</span><span>3:41</span></div>
+        <div class="row"><span>Time on video</span><span>0:01</span></div>
+        <div class="row"><span>Head turns</span><span>14</span></div>
+        <div class="row"><span>Metres chasing Skip</span><span>6.2</span></div>
+        <div class="row"><span>Peak volume</span><span>0.41</span></div><hr>
+        <div style="text-align:center">Thank you for watching</div>
+      </div>
+    </div>
+    <figcaption><b>7 · Finale.</b> TV shrinks to postcard size, an ad fills the sky, banner, receipt floats to the right.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="still"><div class="rug"></div>
+      <div class="tv gloop" style="left:44%"><div>GLOOP<small>It's goo. It's good.</small></div></div>
+      <div class="panel kpi"><h4>Q4 ATTENTION REPORT</h4>
+        <div class="tiles">
+          <div class="tile">Sessions<b>23</b></div>
+          <div class="tile">Ad : video<b>221 : 1</b></div>
+          <div class="tile">Head turns<b>318</b></div>
+          <div class="tile">m chased<b>142.6</b></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>8 · KPI board.</b> Floats beside the TV with real totals from logged sessions. Reading it counts as looking away.</figcaption>
+  </figure>
+</div>
+</body>
+</html>
