@@ -197,3 +197,17 @@ Open the page with `?fakeout` added to the address. Tap Start, then Enter VR. On
 8. Reload without `?fakeout`. The run is the original one.
 
 Report for step 3: whether the voice plays at all on the Quest, whether it is louder or quieter than the video, and whether its start sounds like a cut.
+
+## Branch `ai-fakeout-voice`: the speaker says the line on camera (15:00)
+
+Bader raised the bar at 14:50: the person in the video says "Watch the ad" with his own face and voice, with no visible or audible cut. The fake-out is also last in priority now, and this branch merges only if the whole thing works.
+
+What the branch adds to `main` (8d371e5 and later):
+
+- A video can say the line itself. Its `public/voices/<id>.json` has `lineAt`, the second where the line starts. The page leaves that video unmuted and keeps the separate voice off while it shows. When GLOOP comes back, the voice takes over: it is the video's own sound from `lineAt` to its end, on a loop.
+- The resumed video's step ends when its file ends, so a short clip brings GLOOP back at its last frame.
+- `node scripts/make-voice.mjs <id> --line-at <seconds>` makes both files from `public/videos/<id>.mp4`.
+
+Checked: `npm test` passes with 161 tests, `npm run build` passes, each new behavior has a test that fails without it. In headless desktop Chrome with a 6 s stand-in clip the whole flow ran with no page errors.
+
+The clip itself does not exist. The plan was one generated 6 s presenter clip (Seedance 2.0 Mini, 480p, 3 credits by `higgsfield generate cost`), so the face, the voice and the cut cannot mismatch. Higgsfield refuses to generate from the CLI on a trial plan (`only_mcp_usage_on_trial_is_available`). The Higgsfield MCP server is added to Bader's Claude config, user scope, and still needs his approval in the browser: `claude mcp login higgsfield`.
