@@ -17,19 +17,20 @@ function until(run, done, signals = () => ({})) {
   throw new Error('condition never held within 60 s');
 }
 
-// Holds select until the current ad is force-passed, then lets go.
+// Pinches and holds until the current ad is force-passed, then lets go.
 function forcePass(run) {
   const from = run.t;
   const screen = run.out.screen;
-  const entered = until(run, (out) => out.screen !== screen, (t) => ({ selectHeld: t - from }));
+  const held = (t) => ({ selectStarted: t === from, selectHeld: t - from });
+  const entered = until(run, (out) => out.screen !== screen, held);
   run.frame();
   return entered;
 }
 
 // A rule that adds to the stats on frames where the test sets `bump`.
 const bump = {
-  name: 'bump',
-  create: () => (signals) => (signals.bump ? { addStats: { headTurns: 1, chaseMetres: 0.25 } } : {}),
+  id: 'bump',
+  createRule: () => (signals) => (signals.bump ? { stats: { headTurns: 1, chaseMetres: 0.25 } } : {}),
 };
 
 describe('finale entry', () => {
