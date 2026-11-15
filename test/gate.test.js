@@ -16,11 +16,11 @@ function atWrapzilla() {
 }
 
 describe('gate, mic working', () => {
-  it('says "Say WRAPZILLA to continue" and shows the meter with the live level', () => {
+  it('says "Say FLEX TAPE to continue" and shows the meter with the live level', () => {
     const run = atWrapzilla();
     const out = run.frame(micOn(0.07));
-    expect(out.banner).toBe('Say WRAPZILLA to continue');
-    expect(out.gate).toEqual({ visible: true, level: 0.07, line: 0.15, label: 'Say WRAPZILLA to continue' });
+    expect(out.banner).toBe('Say FLEX TAPE to continue');
+    expect(out.gate).toEqual({ visible: true, level: 0.07, line: 0.15, label: 'Say FLEX TAPE to continue' });
   });
 
   it('passes when the level crosses the 0.15 line', () => {
@@ -35,7 +35,7 @@ describe('gate, mic working', () => {
     run.run(20, micOn(0.01)); // a quiet room
     run.run(5, micOn(0)); // dead quiet, mic still working
     expect(run.out.screen).toBe('ad3');
-    expect(run.out.banner).toBe('Say WRAPZILLA to continue');
+    expect(run.out.banner).toBe('Say FLEX TAPE to continue');
     expect(run.out.gate.visible).toBe(true);
   });
 
@@ -50,7 +50,7 @@ describe('gate, mic unavailable', () => {
   it('switches to "Clap to continue" after 2 s of the mic being unavailable from WRAPZILLA start', () => {
     const run = atWrapzilla(); // the 2 s count from WRAPZILLA's start; base signals have no mic
     run.run(2 - DT);
-    expect(run.out.banner).toBe('Say WRAPZILLA to continue');
+    expect(run.out.banner).toBe('Say FLEX TAPE to continue');
     const out = run.frame(); // t = 2
     expect(out.banner).toBe('Clap to continue');
     expect(out.gate.label).toBe('Clap to continue');
@@ -82,7 +82,7 @@ describe('gate, mic unavailable', () => {
     const run = atWrapzilla();
     run.run(5, micOn(0.01));
     run.run(2); // mic unavailable: frames at 0 … 2 − DT after it stopped
-    expect(run.out.banner).toBe('Say WRAPZILLA to continue');
+    expect(run.out.banner).toBe('Say FLEX TAPE to continue');
     expect(run.frame().banner).toBe('Clap to continue'); // 2 s after it stopped
   });
 });

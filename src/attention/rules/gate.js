@@ -8,7 +8,7 @@ export const id = 'gate';
 
 export const GATE_LINE = 0.15; // quiet room ~0.01 < line < a shout (M1 in-VR peak 0.203–0.247)
 export const MIC_UNAVAILABLE_SECONDS = 2;
-export const SAY_LABEL = 'Say WRAPZILLA to continue';
+export const SAY_LABEL = 'Say FLEX TAPE to continue';
 export const CLAP_LABEL = 'Clap to continue';
 
 export function createRule() {
