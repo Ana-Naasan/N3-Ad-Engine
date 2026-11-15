@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unskippable VR</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1a1410; overflow: hidden; font-family: system-ui, sans-serif; }
+      #intro {
+        position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+        z-index: 10; text-align: center; color: #f4e9d8;
+      }
+      #intro h1 { margin: 0 0 12px; font-size: 28px; }
+      #start {
+        font-size: 22px; padding: 14px 32px; border-radius: 10px; border: 0;
+        background: #e9a03b; color: #1a1410; font-weight: 700; cursor: pointer;
+      }
+      #start:disabled { opacity: 0.5; }
+      #status { margin-top: 10px; font-size: 16px; min-height: 1.2em; }
+    </style>
+  </head>
+  <body>
+    <div id="intro">
+      <h1>Unskippable VR</h1>
+      <button id="start">Start</button>
+      <div id="status">Tap Start to allow the mic, then Enter VR.</div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
