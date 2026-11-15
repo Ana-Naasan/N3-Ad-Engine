@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { defineConfig } from 'vite';
 import { STAT_KEYS, parseSession, sessionTotals } from './server/session-totals.js';
 import { createYoutubeMirror, parseInput } from './server/youtube-mirror.js';
+import { createYoutubeAudio, mirrorTime } from './server/youtube-audio.js';
 
 const MAX_BODY = 2 * 1024 * 1024; // the tunnel is public: cap uploads
 const FRAME_WAIT_MS = 2000; // how long a YouTube frame request waits for the screen to change
@@ -93,6 +94,7 @@ function questLog() {
 
       // --- YouTube on the TV: see server/youtube-mirror.js. Chrome starts on the first request. ---
       const youtube = createYoutubeMirror();
+      const audio = createYoutubeAudio();
       server.httpServer?.on('close', () => youtube.stop()); // also on a config restart
       // Long-poll: the next frame after ?after=<seq> as a JPEG, or 204 if the screen
       // didn't change or YouTube is still loading, or 503 if its page is broken. Headers say whether a video is playing and name a featured pick.
@@ -106,6 +108,10 @@ function questLog() {
           res.setHeader('Cache-Control', 'no-store');
           res.setHeader('X-Yt-Playing', youtube.state.playing ? '1' : '0');
           res.setHeader('X-Yt-Local', youtube.state.local ?? '');
+          const { videoId, local } = youtube.state; // a picked video's sound, see server/youtube-audio.js
+          if (videoId && !local) audio.want(videoId);
+          res.setHeader('X-Yt-Audio', videoId && !local && audio.status(videoId) === 'ready' ? videoId : '');
+          res.setHeader('X-Yt-Time', mirrorTime(youtube.state, Date.now()).toFixed(3));
           res.setHeader('X-Yt-Seq', String(frame?.seq ?? after));
           if (!frame || status !== 'ready') {
             // Loading: no frame yet. Ask again after a probe rather than spin on loading frames.
@@ -119,6 +125,12 @@ function questLog() {
         } catch (e) {
           sendJson(res, 503, { error: e.message });
         }
+      });
+      // A picked video's sound as m4a, once X-Yt-Audio names it. Supports Range.
+      server.middlewares.use('/api/youtube/audio', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const id = new URL(req.url, 'http://localhost').pathname.replace(/^\/|\.m4a$/g, '');
+        if (!audio.serve(id, req, res)) sendJson(res, 404, { error: `no audio for ${id}` });
       });
       // One event: {type: 'move' | 'click', x, y}, {type: 'scroll', x, y, dy}, or {type: 'reset' | 'pause' | 'play'}.
       server.middlewares.use('/api/youtube/input', (req, res, next) => {
