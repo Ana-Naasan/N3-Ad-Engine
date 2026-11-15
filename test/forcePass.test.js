@@ -41,10 +41,11 @@ describe('force-pass', () => {
     expect(run.out.screen).toBe('ad2');
   });
 
-  it('does nothing in the finale', () => {
+  it('never passes the finale (a 2 s hold there restarts instead: see restart.test.js)', () => {
     const run = createRun();
     run.frame({ jumpTo: 4 });
-    run.run(10, holding);
+    run.run(1.5, holding);
+    run.run(5);
     expect(run.out.screen).toBe('ad4');
   });
 });

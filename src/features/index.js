@@ -18,6 +18,7 @@ import finale from './finale.js';
 import sessionPost from './session-post.js';
 import kpiBoard from './kpi-board.js';
 import debugPanel from './debug-panel.js';
+import hints from './hints.js';
 
 export const FEATURES = [
   tvScreen,
@@ -29,5 +30,6 @@ export const FEATURES = [
   finale, // #10
   sessionPost, // #11
   kpiBoard, // #11
+  hints, // rehearsal hints, only with ?hints
   debugPanel,
 ];
