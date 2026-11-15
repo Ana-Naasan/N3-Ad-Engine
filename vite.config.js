@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { defineConfig } from 'vite';
+import { STAT_KEYS, parseSession, sessionTotals } from './server/session-totals.js';
 
 const MAX_BODY = 2 * 1024 * 1024; // the tunnel is public: cap uploads
 
@@ -28,57 +29,14 @@ function sendJson(res, status, body) {
 
 // --- Session summaries for the KPI board (#11) ---
 const SESSIONS_FILE = 'logs/sessions.jsonl';
-const STAT_KEYS = ['adTime', 'videoTime', 'headTurns', 'chaseMetres', 'peakVolume']; // attention output `stats`
 
-// Returns a clean session summary, or null if it doesn't match the contract.
-function parseSession(value) {
-  if (!value || typeof value !== 'object') return null;
-  const { stats, timestamp, usedJump } = value;
-  if (typeof usedJump !== 'boolean') return null;
-  if (typeof timestamp !== 'string' || Number.isNaN(Date.parse(timestamp))) return null;
-  if (!stats || typeof stats !== 'object') return null;
-  const clean = {};
-  for (const key of STAT_KEYS) {
-    const n = stats[key];
-    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
-    clean[key] = n;
-  }
-  return { timestamp, usedJump, stats: clean };
-}
-
-const HISTORY_LENGTH = 20; // running totals kept for the board's sparklines
-
-// Totals over the sessions file. Skips unreadable lines and key-jump test runs.
-// `history` holds the running totals after each of the last HISTORY_LENGTH sessions, oldest first.
-function sessionTotals() {
-  const totals = { sessions: 0, adTime: 0, videoTime: 0, ratio: null, headTurns: 0, chaseMetres: 0 };
-  const history = [];
-  let text = '';
+function readSessionsFile() {
   try {
-    text = fs.readFileSync(SESSIONS_FILE, 'utf8');
+    return fs.readFileSync(SESSIONS_FILE, 'utf8');
   } catch (e) {
-    if (e.code !== 'ENOENT') throw e;
+    if (e.code === 'ENOENT') return '';
+    throw e;
   }
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    let session;
-    try {
-      session = parseSession(JSON.parse(line));
-    } catch {
-      continue;
-    }
-    if (!session || session.usedJump) continue;
-    totals.sessions++;
-    totals.adTime += session.stats.adTime;
-    totals.videoTime += session.stats.videoTime;
-    totals.headTurns += session.stats.headTurns;
-    totals.chaseMetres += session.stats.chaseMetres;
-    totals.ratio = totals.videoTime > 0 ? totals.adTime / totals.videoTime : null;
-    const { sessions, ratio, headTurns, chaseMetres } = totals;
-    history.push({ sessions, ratio, headTurns, chaseMetres });
-    if (history.length > HISTORY_LENGTH) history.shift();
-  }
-  return { ...totals, history };
 }
 
 // Dev-only endpoints the headset posts to (see src/remote-log.js).
@@ -121,7 +79,7 @@ function questLog() {
       server.middlewares.use('/api/totals', (req, res, next) => {
         if (req.method !== 'GET') return next();
         try {
-          sendJson(res, 200, sessionTotals());
+          sendJson(res, 200, sessionTotals(readSessionsFile()));
         } catch (e) {
           sendJson(res, 500, { error: e.message });
         }
