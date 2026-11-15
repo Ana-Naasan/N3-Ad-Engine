@@ -13,6 +13,5 @@ export default function bannerTint({ world, tv }) {
     tint.setOn(output.tint === 'red');
     banner.setText(output.banner);
     banner.placeUnder(tv.group);
-    return { debug: { tint: output.tint, banner: output.banner } };
   };
 }

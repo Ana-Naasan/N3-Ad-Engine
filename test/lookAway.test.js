@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
 
 const BANNER = 'Please return your eyes to the ad';
+const LOOKING_AWAY = { playing: false, tint: 'red', banner: BANNER };
 
 describe('looking away', () => {
   it('above 30° pauses the ad, tints the room red and shows the banner', () => {
@@ -13,7 +14,7 @@ describe('looking away', () => {
     run.toFirstAd();
     const out = run.frame({ headAngle: 31 });
     expect(out.screen).toBe('ad1');
-    expect(out).toMatchObject({ playing: false, tint: 'red', banner: BANNER });
+    expect(out).toMatchObject(LOOKING_AWAY);
   });
 
   // Angles that swing inside 25°–30°, a new one each frame.
@@ -36,7 +37,7 @@ describe('looking away', () => {
     run.frame({ headAngle: 31 });
     for (let i = 0; i < 64; i++) {
       const out = run.frame(hover(i / 16));
-      expect(out).toMatchObject({ playing: false, tint: 'red', banner: BANNER });
+      expect(out).toMatchObject(LOOKING_AWAY);
     }
     expect(run.frame({ headAngle: 30 }).playing).toBe(false);
     expect(run.frame({ headAngle: 25 }).playing).toBe(false);
@@ -186,7 +187,8 @@ describe('where look-away does not apply', () => {
       expect(out).toMatchObject({ playing: true, tint: null, banner: null, seek: 0 });
     }
     expect(run.out.stats.headTurns).toBe(0);
-    expect(run.frame({ headAngle: 40 })).toMatchObject({ playing: false, tint: 'red', banner: BANNER });
+    expect(run.frame({ headAngle: 40 })).toMatchObject(LOOKING_AWAY);
+    expect(run.out.stats.headTurns).toBe(1); // a new look-away starts: one head turn
   });
 
   it('palms going up ends the look-away and resets the 3 s count', () => {
@@ -203,6 +205,6 @@ describe('where look-away does not apply', () => {
   it('it does apply to WRAPZILLA, a gimmick ad without the exemption', () => {
     const run = createRun();
     run.frame({ jumpTo: 3 });
-    expect(run.frame({ headAngle: 40 })).toMatchObject({ screen: 'ad3', playing: false, tint: 'red', banner: BANNER });
+    expect(run.frame({ headAngle: 40 })).toMatchObject({ screen: 'ad3', ...LOOKING_AWAY });
   });
 });

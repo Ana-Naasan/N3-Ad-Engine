@@ -4,8 +4,8 @@ import * as THREE from 'three';
 // shell around the viewer, drawn over everything with a lower renderOrder,
 // TV included. Add it to the scene or `world`: the viewer only has to be inside.
 
-export const TINT_COLOR = 0x96000a; // still 2: rgba(150, 0, 10, 0.45)
-export const TINT_OPACITY = 0.45;
+const TINT_COLOR = 0x96000a; // still 2: rgba(150, 0, 10, 0.45)
+const TINT_OPACITY = 0.45;
 export const TINT_RENDER_ORDER = 10; // anything drawn after this stays untinted (the banner)
 
 const SHELL_RADIUS = 8; // metres: bigger than the 5 x 6 m room, well inside the camera's far plane
