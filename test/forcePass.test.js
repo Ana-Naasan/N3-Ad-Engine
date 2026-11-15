@@ -1,4 +1,4 @@
-// Force-pass (2 s select hold) and jump-to-ad (keys 1–4).
+// Force-pass (a 2 s select hold) and jump-to-ad (keys 1–4).
 import { describe, it, expect } from 'vitest';
 import { createRun } from './helpers/frames.js';
 
@@ -6,7 +6,7 @@ import { createRun } from './helpers/frames.js';
 const holding = (elapsed) => ({ selectStarted: elapsed === 0, selectHeld: elapsed });
 
 describe('force-pass', () => {
-  it('a 2 s select hold passes the current ad', () => {
+  it('a select started during the ad and held 2 s passes it', () => {
     const run = createRun();
     run.toFirstAd();
     run.run(2, holding); // held 0 … 2 − DT
@@ -23,20 +23,22 @@ describe('force-pass', () => {
     expect(run.out.screen).toBe('ad2');
   });
 
-  it('the Play pinch cannot pass GLOOP: the hold timer resets on ad change', () => {
+  it('a Play pinch held 3 s (or longer) does not pass GLOOP', () => {
     const run = createRun();
-    // Pinch on the card and keep holding through the content into GLOOP.
-    run.run(3, holding); // GLOOP starts at 1 s held, so 2 s into GLOOP is 3 s held
+    // Pinch on the card and keep holding: content for 1 s, then GLOOP.
+    run.run(3, holding);
+    expect(run.frame({ selectHeld: 3 }).screen).toBe('ad1');
+    run.run(5, (e) => ({ selectHeld: 3 + e }));
     expect(run.out.screen).toBe('ad1');
-    expect(run.frame({ selectHeld: 3 }).screen).toBe('ad2');
   });
 
-  it('a long hold passes one ad, not several', () => {
+  it('one long hold passes one ad, not several', () => {
     const run = createRun();
     run.toFirstAd();
-    run.run(4, holding); // passed GLOOP at 2 s held
+    run.run(2, holding);
+    expect(run.frame({ selectHeld: 2 }).screen).toBe('ad2');
+    run.run(10, (e) => ({ selectHeld: 2 + e }));
     expect(run.out.screen).toBe('ad2');
-    expect(run.frame({ selectHeld: 4 }).screen).toBe('ad3');
   });
 
   it('does nothing in the finale', () => {

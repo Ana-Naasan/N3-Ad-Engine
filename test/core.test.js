@@ -4,12 +4,11 @@
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
 import { LINEUP } from '../src/attention/lineup.js';
-import { forcePassJump } from '../src/attention/rules/force-pass-jump.js';
 
 // A rule that returns a fixed partial on every frame while `when` holds.
-const fakeRule = (name, partial, when = () => true) => ({
-  name,
-  create: () => (signals, ad) => (when(signals, ad) ? partial : {}),
+const fakeRule = (id, partial, when = () => true) => ({
+  id,
+  createRule: () => (signals, ad) => (when(signals, ad) ? partial : {}),
 });
 
 describe('card and content', () => {
@@ -95,13 +94,33 @@ describe('gimmick ads', () => {
 });
 
 describe('the finale (VOIDCOLA)', () => {
-  it('sets the finale flag, shows its banner and never ends', () => {
+  it('sets the finale flag and shows its banner', () => {
     const run = createRun();
     const out = run.frame({ jumpTo: 4 });
     expect(out.screen).toBe('ad4');
     expect(out.finale).toBe(true);
     expect(out.banner).toBe('Your video will resume after 2 more ads');
-    expect(run.run(40).screen).toBe('ad4');
+  });
+
+  it('loops forever and never advances, even when a rule reports passed', () => {
+    const run = createRun({ rules: [fakeRule('p', { passed: true })] });
+    run.frame({ jumpTo: 4 });
+    run.video.failed = false;
+    let out = run.run(40); // the fake video wraps 4 times
+    expect(out.screen).toBe('ad4');
+    expect(out.loop).toBe(true);
+    expect(out.playing).toBe(true);
+    run.video.failed = true;
+    expect(run.run(15).screen).toBe('ad4');
+  });
+
+  it('every ad\'s own banner comes from the lineup', () => {
+    const banners = [1, 2, 3, 4].map((n) => {
+      const run = createRun();
+      run.frame({ jumpTo: n });
+      return run.frame().banner;
+    });
+    expect(banners).toEqual([null, null, null, 'Your video will resume after 2 more ads']);
   });
 
   it('the lineup turns look-away and palms off only in the finale', () => {
@@ -118,11 +137,11 @@ describe('the finale (VOIDCOLA)', () => {
 describe('merging rule results', () => {
   const lineupWithBanner = LINEUP.map((s) => (s.screen === 'ad1' ? { ...s, banner: 'ad banner' } : s));
 
-  it('banner priority: look-away > hold-still > gate > the ad\'s own banner', () => {
-    const on = { lookAway: true, holdStill: true, gate: true };
-    const rules = [
+  it('banner priority by rule id: lookAway > skip (hold-still) > gate > the ad\'s own banner', () => {
+    const on = { lookAway: true, skip: true, gate: true };
+    const rules = [ // listed lowest priority first: list order must not matter
       fakeRule('gate', { banner: 'gate' }, () => on.gate),
-      fakeRule('holdStill', { banner: 'hold' }, () => on.holdStill),
+      fakeRule('skip', { banner: 'hold' }, () => on.skip),
       fakeRule('lookAway', { banner: 'look' }, () => on.lookAway),
     ];
     const run = createRun({ lineup: lineupWithBanner, rules });
@@ -130,7 +149,7 @@ describe('merging rule results', () => {
     expect(run.frame().banner).toBe('look');
     on.lookAway = false;
     expect(run.frame().banner).toBe('hold');
-    on.holdStill = false;
+    on.skip = false;
     expect(run.frame().banner).toBe('gate');
     on.gate = false;
     expect(run.frame().banner).toBe('ad banner');
@@ -179,15 +198,15 @@ describe('merging rule results', () => {
     const out = run.frame();
     expect(out).toMatchObject({
       target: 'tv', tvDim: false, tint: null, banner: null, seek: 0, finale: false,
-      skip: { state: 'hidden', progress: 0, jump: false },
+      skip: { state: 'hidden', progress: 0, jump: 0 },
       gate: { visible: false },
       usedJump: false,
     });
   });
 
   it('only the skip rule sets the Skip state', () => {
-    const skip = { state: 'running', progress: 0, jump: true };
-    const run = createRun({ rules: [fakeRule('other', { skip: { state: 'enabled', progress: 1, jump: false } })] });
+    const skip = { state: 'running', progress: 0, jump: 3 };
+    const run = createRun({ rules: [fakeRule('other', { skip: { state: 'enabled', progress: 1, jump: 0 } })] });
     run.toFirstAd();
     expect(run.frame().skip.state).toBe('hidden');
     const run2 = createRun({ rules: [fakeRule('skip', { skip })] });
@@ -231,8 +250,8 @@ describe('stats', () => {
     expect(run.frame({ micLevel: 0.1 }).stats.peakVolume).toBe(0.2);
   });
 
-  it('adds stat increments from rules', () => {
-    const run = createRun({ rules: [fakeRule('t', { addStats: { headTurns: 1, chaseMetres: 0.25 } })] });
+  it('sums the stat amounts rules return', () => {
+    const run = createRun({ rules: [fakeRule('t', { stats: { headTurns: 1, chaseMetres: 0.25 } })] });
     run.frame();
     const { stats } = run.frame();
     expect(stats.headTurns).toBe(2);
@@ -240,12 +259,13 @@ describe('stats', () => {
   });
 
   it('freezes all stats at finale entry', () => {
-    const run = createRun({ rules: [forcePassJump, fakeRule('t', { addStats: { headTurns: 1 } })] });
+    const run = createRun({ rules: [fakeRule('t', { stats: { headTurns: 1, chaseMetres: 0.5 } })] });
     run.toFirstAd();
     run.run(2, { micLevel: 0.1 });
     const atEntry = run.frame({ jumpTo: 4 }).stats;
     run.run(5, { micLevel: 0.9 });
     expect(run.out.stats).toEqual(atEntry);
     expect(atEntry.peakVolume).toBe(0.1);
+    expect(atEntry.headTurns).toBeGreaterThan(0);
   });
 });

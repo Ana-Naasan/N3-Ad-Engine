@@ -1,9 +1,12 @@
-// The registered rule list: one line per rule. Each rule is
-// { name, create() } and create() returns (signals, ad) => result, where
-// result is a partial output plus optional `passed`, `jumpTo` and `addStats`.
-// See src/attention/index.js for how results are merged.
-import { forcePassJump } from './force-pass-jump.js';
+// The complete rule list. Each rule module exports `id` and `createRule()`;
+// createRule() returns update(signals, ad), which returns a partial output
+// plus optional `passed` and optional `stats` (amounts to add, e.g.
+// { headTurns: 1 }). Merging is by rule id, never list order: see
+// ../index.js. Later tickets fill in their rule's file, not this list.
+import * as forcePass from './forcePass.js';
+import * as lookAway from './lookAway.js';
+import * as palms from './palms.js';
+import * as skip from './skip.js';
+import * as gate from './gate.js';
 
-export const RULES = [
-  forcePassJump,
-];
+export const RULES = [forcePass, lookAway, palms, skip, gate];

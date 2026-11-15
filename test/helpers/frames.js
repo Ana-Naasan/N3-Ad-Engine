@@ -18,7 +18,6 @@ export function baseSignals(t) {
     fingertips: [],
     fingertipTravel: 0,
     skipDistance: null,
-    skipTouched: false,
     selectStarted: false,
     selectHeld: 0,
     micLevel: null,
