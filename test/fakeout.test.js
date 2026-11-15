@@ -390,6 +390,16 @@ describe('the voice feature', () => {
     expect(mirror.content.muted).toBe(false);
     expect(mirror.voice.calls).toEqual([]);
   });
+
+  it('leaves the video\'s sound on when its voice file did not load', () => {
+    const { voice, content, ad, drive, dodge } = setUp({ contentId: 'dQw4w9WgXcQ' });
+    dodge();
+    voice.el.error = { code: 4 }; // what the browser sets for a missing /voices/<id>.m4a
+    expect(drive(8).debug.fakeoutVoice).toBe('no voice file (dQw4w9WgXcQ)');
+    expect(content.muted).toBe(false);
+    expect(ad.volume).toBe(1);
+    expect(voice.calls).toEqual([]);
+  });
 });
 
 describe('the ?fakeout flag', () => {

@@ -90,7 +90,9 @@ export default function fakeoutVoice({ tv }) {
     const now = content.currentTime;
     const atPause = !pauses.length || pauses.some(([start, end]) => now >= start && now < end);
 
-    const want = nag({ screen: output.screen, t: signals.t, atPause }) && Boolean(voiceId);
+    // A video with no voice file keeps its own sound: muting it would leave silence.
+    const missing = Boolean(voiceId && voice.error);
+    const want = nag({ screen: output.screen, t: signals.t, atPause }) && Boolean(voiceId) && !missing;
     if (want !== on) {
       on = want;
       content.muted = on;
@@ -102,6 +104,7 @@ export default function fakeoutVoice({ tv }) {
         voice.pause();
       }
     }
-    return { debug: { fakeoutVoice: on ? `on (${voiceId})` : 'off' } };
+    const state = on ? `on (${voiceId})` : missing ? `no voice file (${voiceId})` : 'off';
+    return { debug: { fakeoutVoice: state } };
   };
 }
