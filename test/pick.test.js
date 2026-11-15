@@ -35,8 +35,11 @@ describe('card with a picker (signals.pick)', () => {
     const run = createRun();
     run.frame({ pick: true });
     while (!run.out.finale) run.frame({ jumpTo: run.out.finale ? null : 4 });
-    // Restart: a select started in the finale and held 2 s goes back to the card.
-    run.frame({ selectStarted: true });
+    // Restart: a select brings the pop-up up, then a new one held 2 s goes back to the card.
+    run.run(3.5, { pick: false });
+    run.frame({ pick: false, selectStarted: true });
+    run.run(0.5, { pick: false });
+    run.frame({ pick: false, selectStarted: true });
     run.run(2.5, (elapsed) => ({ pick: false, selectHeld: elapsed }));
     expect(run.out.screen).toBe('card');
     expect(run.run(1, { pick: false }).screen).toBe('card');
