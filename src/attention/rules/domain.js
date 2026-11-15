@@ -2,7 +2,7 @@
 // ?domain=0), so it is not in ./index.js. Contract: see ./index.js.
 //
 // The first WARNINGS look-aways are warnings: the look-away banner gains
-// "(warning 2 of 3)". The look-away after the final warning starts the domain
+// "(warning 1 of 2)". The look-away after the final warning starts the domain
 // instead. For DOMAIN_CAST_SECONDS + DOMAIN_SECONDS this rule sets `domain`,
 // so the core ignores every other rule but force-pass, and the ad stays
 // paused. Then the ad starts again from the top and the warnings are back.
@@ -15,7 +15,7 @@ import { LOOK_AWAY_START_DEG, LOOK_AWAY_END_DEG, LOOK_AWAY_BANNER } from './look
 
 export const id = 'domain';
 
-export const WARNINGS = 3; // look-aways that only warn
+export const WARNINGS = 2; // look-aways that only warn
 export const DOMAIN_CAST_SECONDS = 5; // Gojo arrives and casts
 export const DOMAIN_SECONDS = 30; // the ad wall
 

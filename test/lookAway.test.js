@@ -10,7 +10,7 @@ import { domainFor } from '../src/domain.js';
 // The run as main.js builds it: RULES, then the domain rule, which puts the warning count in the banner.
 const createRun = () => createRunWith({ rules: [...RULES, ...domainFor('').rules] });
 
-const BANNER = 'Please return your eyes to the ad (warning 1 of 3)'; // each run's first look-away
+const BANNER = 'Please return your eyes to the ad (warning 1 of 2)'; // each run's first look-away
 const LOOKING_AWAY = { playing: false, tint: 'red', banner: BANNER };
 
 describe('looking away', () => {
