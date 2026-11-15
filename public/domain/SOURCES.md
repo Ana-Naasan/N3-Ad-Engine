@@ -1,8 +1,8 @@
 Third-party media for the Gojo domain branch. Downloaded on 2026-11-15 (from YouTube unless a section says otherwise); not ours.
 
-Only this file is in the repo: `.gitignore` leaves the media out. The domain stays off until
-`ads.mp4`, `voice.m4a`, `teleport.m4a` and `gojo.glb` are all in `public/domain/`. Reload the page
-after copying them in. `?domain=0` turns the domain off.
+The four media files are in the repo next to this file, so a fresh clone has the domain on.
+The domain turns itself off if `ads.mp4`, `voice.m4a`, `teleport.m4a` or `gojo.glb` is missing
+from `public/domain/`. `?domain=0` turns the domain off.
 
 ## `ads.mp4` (1920x720, six 640x360 cells, row-major, 30 s)
 

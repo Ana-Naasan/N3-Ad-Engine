@@ -3,7 +3,3 @@ dist/
 .DS_Store
 .env*
 logs/
-
-# Third-party media for ?domain: not in the repo. public/domain/SOURCES.md lists it.
-public/domain/*
-!public/domain/SOURCES.md
