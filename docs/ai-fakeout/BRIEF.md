@@ -180,3 +180,20 @@ Bader chose Higgsfield and asked for the setup. On this Mac:
 - `higgsfield voices list` shows 114 preset voices and no cloned one. The CLI has no command that creates a saved cloned voice.
 
 To make the real voice: get a 10 to 15 s sample of the speaker, run `seed_audio` with it and the line, then `node scripts/make-voice.mjs <id> <the download>`. Other tools, should Higgsfield sound wrong: [research/voice-cloning.md](research/voice-cloning.md).
+
+## Headset checklist for `?fakeout`
+
+For whoever has the Quest. It goes in a comment on this branch's PR once Bader allows the PR. The repo is public: the tunnel URL, real voice clips and real videos stay out of it.
+
+Open the page with `?fakeout` added to the address. Tap Start, then Enter VR. Start the video with "Pinch to play" (a video picked from the YouTube mirror has no sound, so it gets no voice).
+
+1. GLOOP starts after 1 s. Turn your head away from the TV and back, twice. The banner reads "Warning 1 of 3", then "Warning 2 of 3".
+2. Turn away a third time and stay away for 3 s. GLOOP ends and the video comes back with the banner "Fine. Enjoy your video."
+3. Watch the video. Between 3 s and 7.5 s in, its own sound stops and a voice says "Don't skip the ad" on a loop. The picture must not cut or jump.
+4. After 10 s of video, GLOOP comes back. The voice carries on over it and GLOOP is quieter.
+5. Turn away once. GLOOP pauses and the voice keeps going.
+6. Watch GLOOP to its end. The voice stops and GRIN+ starts at normal volume.
+7. Reload with `?fakeout` and watch the first GLOOP to its end without turning away. GRIN+ follows, with no voice.
+8. Reload without `?fakeout`. The run is the original one.
+
+Report for step 3: whether the voice plays at all on the Quest, whether it is louder or quieter than the video, and whether its start sounds like a cut.
