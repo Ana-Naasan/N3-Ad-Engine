@@ -31,6 +31,10 @@ const CARD = { kind: 'card', screen: 'card' };
 // (back to the card, fresh stats), so takes can follow each other in VR.
 export const RESTART_SECONDS = 2;
 
+// This long into the finale, the "Screen Time Limit Reached" pop-up comes up
+// (output.popup): the TV grows back as if the video resumes, and the pop-up covers it.
+export const POPUP_AFTER_SECONDS = 6;
+
 export function createAttention(lineup = LINEUP, rules = RULES) {
   const ruleFns = rules.map((r) => ({ id: r.id, update: r.createRule() }));
   const ads = lineup.filter((s) => s.kind === 'ad');
@@ -119,6 +123,7 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       skip: { state: 'hidden', progress: 0, jump: 0 }, // jump: a jump count
       gate: { visible: false, level: 0, line: null, label: null },
       finale: Boolean(step.finale),
+      popup: Boolean(step.finale) && t - step.startedAt >= POPUP_AFTER_SECONDS,
       domain: null,
       stats: { ...stats },
       usedJump,
