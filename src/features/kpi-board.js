@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as lookAway from '../attention/rules/lookAway.js';
+import { LOOK_AWAY_START_DEG } from '../attention/rules/lookAway.js';
 import { fetchTotals, onSessionPosted } from '../session-api.js';
 
 // "Q4 Attention Report" board: four KPI cards of real session totals, styled
@@ -7,9 +7,8 @@ import { fetchTotals, onSessionPosted } from '../session-api.js';
 // previous session, and a sparkline of the running total.
 
 // Reading any part of the board must start looking away, so its nearest edge
-// sits 5° past look-away's start angle. #6 exports LOOK_AWAY_START_DEG; until
-// then the spec's 30° stands in.
-const NEAR_EDGE_DEG = (lookAway.LOOK_AWAY_START_DEG ?? 30) + 5;
+// sits 5° past look-away's start angle.
+const NEAR_EDGE_DEG = LOOK_AWAY_START_DEG + 5;
 const WIDTH = 0.9; // metres
 const HEIGHT = 0.6;
 const DISTANCE = 1.8; // metres from the viewer to the board's centre
