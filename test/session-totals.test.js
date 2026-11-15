@@ -54,6 +54,7 @@ describe('session totals', () => {
     expect(parseSession({ ...session({}), usedJump: 'no' })).toBeNull();
     expect(parseSession({ ...session({}), timestamp: 'yesterday' })).toBeNull();
     expect(parseSession(session({ peakVolume: undefined }))).toBeNull();
+    expect(parseSession(session({ headTurns: 1e308 }))).toBeNull(); // two of these would sum to Infinity
     expect(parseSession(null)).toBeNull();
   });
 });

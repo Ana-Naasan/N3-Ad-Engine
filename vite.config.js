@@ -73,7 +73,11 @@ function questLog() {
             sendJson(res, 400, { error: 'expected {stats: {' + STAT_KEYS.join(', ') + '}, timestamp, usedJump}' });
             return;
           }
-          fs.appendFileSync(SESSIONS_FILE, JSON.stringify(session) + '\n');
+          try {
+            fs.appendFileSync(SESSIONS_FILE, JSON.stringify(session) + '\n');
+          } catch (e) {
+            sendJson(res, 500, { error: e.message });
+          }
         });
       });
       server.middlewares.use('/api/totals', (req, res, next) => {

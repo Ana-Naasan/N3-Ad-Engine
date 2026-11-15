@@ -3,6 +3,7 @@
 
 export const STAT_KEYS = ['adTime', 'videoTime', 'headTurns', 'chaseMetres', 'peakVolume']; // attention output `stats`
 const HISTORY_LENGTH = 20; // running totals kept for the board's sparklines
+const MAX_STAT = 1e6; // the tunnel is public: a huge value would push the sums to Infinity
 
 // Returns a clean session summary, or null if it doesn't match the contract.
 export function parseSession(value) {
@@ -14,7 +15,7 @@ export function parseSession(value) {
   const clean = {};
   for (const key of STAT_KEYS) {
     const n = stats[key];
-    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
+    if (typeof n !== 'number' || !(n >= 0 && n <= MAX_STAT)) return null;
     clean[key] = n;
   }
   return { timestamp, usedJump, stats: clean };
