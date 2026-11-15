@@ -13,9 +13,65 @@ function readBody(req, res, done) {
   });
   req.on('end', () => {
     done(Buffer.concat(chunks));
+    if (res.writableEnded) return; // the handler already answered
     res.statusCode = 204;
     res.end();
   });
+}
+
+function sendJson(res, status, body) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(JSON.stringify(body));
+}
+
+// --- Session summaries for the KPI board (#11) ---
+const SESSIONS_FILE = 'logs/sessions.jsonl';
+const STAT_KEYS = ['adTime', 'videoTime', 'headTurns', 'chaseMetres', 'peakVolume']; // attention output `stats`
+
+// Returns a clean session summary, or null if it doesn't match the contract.
+function parseSession(value) {
+  if (!value || typeof value !== 'object') return null;
+  const { stats, timestamp, usedJump } = value;
+  if (typeof usedJump !== 'boolean') return null;
+  if (typeof timestamp !== 'string' || Number.isNaN(Date.parse(timestamp))) return null;
+  if (!stats || typeof stats !== 'object') return null;
+  const clean = {};
+  for (const key of STAT_KEYS) {
+    const n = stats[key];
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
+    clean[key] = n;
+  }
+  return { timestamp, usedJump, stats: clean };
+}
+
+// Totals over the sessions file. Skips unreadable lines and key-jump test runs.
+function sessionTotals() {
+  const totals = { sessions: 0, adTime: 0, videoTime: 0, ratio: null, headTurns: 0, chaseMetres: 0 };
+  let text = '';
+  try {
+    text = fs.readFileSync(SESSIONS_FILE, 'utf8');
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    let session;
+    try {
+      session = parseSession(JSON.parse(line));
+    } catch {
+      continue;
+    }
+    if (!session || session.usedJump) continue;
+    totals.sessions++;
+    totals.adTime += session.stats.adTime;
+    totals.videoTime += session.stats.videoTime;
+    totals.headTurns += session.stats.headTurns;
+    totals.chaseMetres += session.stats.chaseMetres;
+  }
+  if (totals.videoTime > 0) totals.ratio = totals.adTime / totals.videoTime;
+  return totals;
 }
 
 // Dev-only endpoints the headset posts to (see src/remote-log.js).
@@ -40,6 +96,28 @@ function questLog() {
           fs.writeFileSync(file, buf);
           fs.copyFileSync(file, 'logs/snaps/latest.jpg');
         });
+      });
+      server.middlewares.use('/api/sessions', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        readBody(req, res, (buf) => {
+          let session = null;
+          try {
+            session = parseSession(JSON.parse(buf));
+          } catch {}
+          if (!session) {
+            sendJson(res, 400, { error: 'expected {stats: {' + STAT_KEYS.join(', ') + '}, timestamp, usedJump}' });
+            return;
+          }
+          fs.appendFileSync(SESSIONS_FILE, JSON.stringify(session) + '\n');
+        });
+      });
+      server.middlewares.use('/api/totals', (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        try {
+          sendJson(res, 200, sessionTotals());
+        } catch (e) {
+          sendJson(res, 500, { error: e.message });
+        }
       });
     },
   };
