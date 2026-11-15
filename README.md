@@ -33,6 +33,7 @@ pointer back as mouse events. Chrome must be installed on the dev machine.
 - The mirror has no sound, and YouTube's own ad may play before the video.
 - A featured video plays from its own file with sound instead: put it at
   `public/videos/<YouTube id>.mp4`, where the id is the part after `v=` in its URL.
+- During each ad the YouTube video pauses, and it carries on from the same spot afterwards.
 - The TV opens on a search results page, because YouTube's home page is empty when signed
   out. Set `YT_START_URL` to open on another page, such as a playlist of the featured videos.
 - Typing isn't supported, so the search box does nothing.
