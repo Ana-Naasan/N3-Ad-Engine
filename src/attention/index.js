@@ -17,9 +17,10 @@
 // signals.jumpTo N (1–4) goes to the Nth ad and sets usedJump, except in
 // the finale.
 // A content step lasts its `seconds` of signals.video.playing, so no ad starts
-// before the viewer's video really plays; if it hasn't played for
-// STALLED_CONTENT_SECONDS, the next ad starts anyway, so a dead video can't
-// strand the viewer.
+// before the viewer's video really plays. If it hasn't played for
+// STALLED_CONTENT_SECONDS, a dead video can't strand the viewer: before the
+// first ad the run goes back to the card (no ad without a working video), and
+// after it the next ad starts.
 // signals.pick: null when the card is the "Pinch to play" card; with a video
 // picker on the TV, false until the viewer picks a video and true once they have.
 //
@@ -101,8 +102,11 @@ export function createAttention(lineup = LINEUP, rules = RULES) {
       lastPlayedAt = t;
     }
     if (step.kind === 'card' && started) goTo(0, t);
-    else if (step.kind === 'content'
-      && (played >= step.seconds || t - lastPlayedAt >= STALLED_CONTENT_SECONDS)) goTo(step.index + 1, t);
+    else if (step.kind === 'content' && played >= step.seconds) goTo(step.index + 1, t);
+    else if (step.kind === 'content' && t - lastPlayedAt >= STALLED_CONTENT_SECONDS) {
+      if (step.index < lineup.indexOf(ads[0])) restart(t);
+      else goTo(step.index + 1, t);
+    }
 
     let results = ruleFns.map(({ id, update }) => ({ id, r: update(signals, step) || {} }));
     if (results.some(({ r }) => r.domain)) {

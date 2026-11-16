@@ -1,6 +1,7 @@
 // The viewer's video between ads: no ad starts until it has really played
 // (signals.video.playing), each beaten ad gives it back, and a video that
-// never plays can't strand the viewer. Spec values (8 s, 5 s, 10 s) are
+// stops playing can't strand the viewer: before the first ad it goes back to
+// the card, after it the next ad starts. Spec values (8 s, 5 s, 10 s) are
 // written out literally so changing a constant makes a test fail.
 import { describe, it, expect } from 'vitest';
 import { createRun, DT } from './helpers/frames.js';
@@ -49,19 +50,38 @@ describe('content', () => {
     expect(out).toMatchObject({ screen: 'content', playing: true, loop: true });
   });
 
-  it('a video that never plays lets the next ad start after 10 s, so the viewer is not stranded', () => {
+  it('before the first ad, a video that never plays goes back to the card after 10 s: no ad without a working video', () => {
     const run = createRun();
     run.frame({ selectStarted: true });
     expect(run.run(10 - DT, stalled).screen).toBe('content');
-    expect(run.frame(stalled).screen).toBe('ad1');
+    expect(run.frame(stalled)).toMatchObject({ screen: 'card', adIndex: 0 });
+    expect(run.run(5, stalled).screen).toBe('card'); // and stays there until the next pick
   });
 
-  it('the 10 s count starts again whenever the video plays', () => {
+  it('before the first ad, a video that plays and then freezes for 10 s goes back to the card too', () => {
     const run = createRun();
     run.frame({ selectStarted: true });
     run.run(6, stalled);
     run.run(1); // plays 1 s
     expect(run.run(9, stalled).screen).toBe('content');
-    expect(run.run(1 + DT, stalled).screen).toBe('ad1');
+    expect(run.run(1 + DT, stalled).screen).toBe('card');
+  });
+
+  it('after an ad, a video that never comes back lets the next ad start after 10 s, so the viewer is not stranded', () => {
+    const run = createRun({ rules: [passer] });
+    run.toFirstAd();
+    run.frame({ pass: true }); // GLOOP beaten: the video's turn
+    expect(run.run(10 - DT, stalled).screen).toBe('content');
+    expect(run.frame(stalled).screen).toBe('ad2');
+  });
+
+  it('the 10 s count starts again whenever the video plays', () => {
+    const run = createRun({ rules: [passer] });
+    run.toFirstAd();
+    run.frame({ pass: true });
+    run.run(6, stalled);
+    run.run(1); // plays 1 s
+    expect(run.run(9, stalled).screen).toBe('content');
+    expect(run.run(1 + DT, stalled).screen).toBe('ad2');
   });
 });
